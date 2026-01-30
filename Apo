@@ -771,13 +771,13 @@ function library:Window(name)
                     Parent = bg
                 })
                 
-                -- VIBRANT "GOOD PURPLE" GRADIENT
+                -- TRUE PURPLE GRADIENT (Red-leaning purple)
                 local sliderGradient = Instance.new("UIGradient")
                 sliderGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(76, 0, 153)), -- Deep Royal Purple
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(221, 26, 255)) -- Vibrant Electric Purple
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 0, 200)), -- Deep Purple (Red-leaning)
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))  -- Bright Magenta (Neon Purple)
                 })
-                sliderGradient.Rotation = 0 -- Horizontal gradient
+                sliderGradient.Rotation = 0 
                 sliderGradient.Parent = fill
 
                 local val = utility.create("TextLabel", {
