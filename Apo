@@ -771,11 +771,11 @@ function library:Window(name)
                     Parent = bg
                 })
                 
-                -- ADDED GRADIENT TO SLIDER
+                -- UPDATED RICH PURPLE GRADIENT
                 local sliderGradient = Instance.new("UIGradient")
                 sliderGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(85, 28, 148)), -- Deep dark purple
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(192, 132, 252))  -- Lighter violet
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(76, 29, 149)), -- Deep Rich Purple
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(167, 70, 255))  -- Vibrant Electric Violet
                 })
                 sliderGradient.Rotation = 0 -- Horizontal gradient
                 sliderGradient.Parent = fill
