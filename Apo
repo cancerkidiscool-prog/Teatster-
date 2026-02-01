@@ -192,14 +192,37 @@ function library:Window(name)
         ResetOnSpawn = false
     })
 
+    -- === AUTOMATIC SCREEN SCALING LOGIC ===
+    local viewportService = game:GetService("ViewportSizeService")
+    local viewSize = viewportService:GetViewportSize()
+    
+    -- Define size percentage (60% of screen width, 70% of screen height)
+    local scaleW = 0.6
+    local scaleH = 0.7
+    
+    local guiWidth = viewSize.X * scaleW
+    local guiHeight = viewSize.Y * scaleH
+
     local holder = utility.create("Frame", {
         Name = "Holder",
-        Size = UDim2.new(0, 750, 0, 550),
-        Position = UDim2.new(0.5, -375, 0.5, -275),
+        Size = UDim2.new(0, guiWidth, 0, guiHeight),
+        Position = UDim2.new(0.5, -(guiWidth/2), 0.5, -(guiHeight/2)),
         BackgroundColor3 = Color3.fromRGB(10, 10, 10),
         BorderSizePixel = 0,
         Parent = gui
     })
+
+    -- Update size dynamically if window is resized
+    local function updateSize()
+        local vs = viewportService:GetViewportSize()
+        local w = vs.X * scaleW
+        local h = vs.Y * scaleH
+        holder.Size = UDim2.new(0, w, 0, h)
+        holder.Position = UDim2.new(0.5, -w/2, 0.5, -h/2)
+    end
+    
+    viewportService:GetPropertyChangedSignal("ViewportSize"):Connect(updateSize)
+    -- =======================================
 
     -- TOGGLE GUI / WATERMARK
     local toggleGui = Instance.new("ScreenGui")
