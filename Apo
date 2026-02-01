@@ -194,21 +194,12 @@ function library:Window(name)
 
     local holder = utility.create("Frame", {
         Name = "Holder",
+        Size = UDim2.new(0, 750, 0, 550),
+        Position = UDim2.new(0.5, -375, 0.5, -275),
         BackgroundColor3 = Color3.fromRGB(10, 10, 10),
         BorderSizePixel = 0,
         Parent = gui
     })
-
-    -- Adaptive sizing based on screen resolution
-    local camera = workspace.CurrentCamera
-    local viewportSize = camera.ViewportSize
-    local scaleFactor = math.min(viewportSize.X * 0.8 / 750, viewportSize.Y * 0.8 / 550)
-    scaleFactor = math.max(scaleFactor, 0.7) -- minimum scale to avoid too tiny on small screens
-    local guiWidth = 750 * scaleFactor
-    local guiHeight = 550 * scaleFactor
-
-    holder.Size = UDim2.new(0, guiWidth, 0, guiHeight)
-    holder.Position = UDim2.new(0.5, -guiWidth / 2, 0.5, -guiHeight / 2)
 
     -- TOGGLE GUI / WATERMARK
     local toggleGui = Instance.new("ScreenGui")
@@ -340,7 +331,7 @@ function library:Window(name)
     local searchContainer = utility.create("Frame", {
         Name = "GlobalSearch",
         Size = UDim2.new(0, 220, 0, 32),
-        Position = UDim2.new(1, -240, 0.5, -16),
+        Position = UDim2.new(1, -240, 0.5, -16),  -- Right-aligned, centered vertically in topBar
         BackgroundColor3 = Color3.fromRGB(18, 18, 18),
         BorderSizePixel = 0,
         ZIndex = 5,
@@ -566,15 +557,17 @@ function library:Window(name)
 
             function sectionActions:Toggle(text, flag, callback)
                 local toggle = utility.create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 30),
+                    Size = UDim2.new(1, 0, 0, 36),
                     BackgroundTransparency = 1,
                     Text = "",
                     ZIndex = 6,
                     Parent = items
                 })
 
-                local toggleLabel = utility.create("TextLabel", {
-                    Size = UDim2.new(1, -55, 1, 0),
+                local textLabel = utility.create("TextLabel", {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Size = UDim2.new(1, -80, 0, 20),
+                    Position = UDim2.new(0, 10, 0.5, 0),
                     BackgroundTransparency = 1,
                     Text = text,
                     TextColor3 = Color3.fromRGB(180, 180, 180),
@@ -585,52 +578,53 @@ function library:Window(name)
                     Parent = toggle
                 })
 
-                local switch = utility.create("Frame", {
-                    Size = UDim2.new(0, 48, 0, 26),
-                    Position = UDim2.new(1, -50, 0.5, -13),
-                    AnchorPoint = Vector2.new(1, 0.5),
+                local track = utility.create("Frame", {
+                    Size = UDim2.new(0, 60, 0, 32),
+                    Position = UDim2.new(1, -70, 0.5, -16),
                     BackgroundColor3 = Color3.fromRGB(30, 30, 30),
                     ZIndex = 7,
                     Parent = toggle
                 })
 
-                utility.create("UICorner", {
-                    CornerRadius = UDim.new(0, 13),
-                    Parent = switch
-                })
+                Instance.new("UICorner", track).CornerRadius = UDim.new(0, 16)
+                utility.stroke(track, Color3.fromRGB(50, 50, 50), 1)
+
+                -- Glow effect when enabled
+                local glow = utility.stroke(track, library.accent, 4)
+                glow.Transparency = 1
 
                 local knob = utility.create("Frame", {
-                    Size = UDim2.new(0, 22, 0, 22),
-                    Position = UDim2.new(0, 2, 0, 2),
-                    BackgroundColor3 = Color3.fromRGB(250, 250, 250),
+                    Size = UDim2.new(0, 28, 0, 28),
+                    BackgroundColor3 = Color3.new(1, 1, 1),
                     ZIndex = 8,
-                    Parent = switch
+                    Parent = track
                 })
 
-                utility.create("UICorner", {
-                    CornerRadius = UDim.new(0, 11),
-                    Parent = knob
-                })
+                Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 14)
+
+                local padding = 4
+                local offPos = UDim2.new(0, padding, 0.5, -14)
+                local onPos = UDim2.new(1, -(28 + padding), 0.5, -14)
+                knob.Position = offPos
 
                 local enabled = false
 
-                local function updateToggle()
-                    local targetColor = enabled and library.accent or Color3.fromRGB(30, 30, 30)
-                    local targetPos = enabled and UDim2.new(1, -24, 0, 2) or UDim2.new(0, 2, 0, 2)
-                    utility.tween(switch, {0.25, Enum.EasingStyle.Quint}, {BackgroundColor3 = targetColor})
-                    utility.tween(knob, {0.25, Enum.EasingStyle.Quint}, {Position = targetPos})
-                end
-
                 toggle.MouseButton1Click:Connect(function()
                     enabled = not enabled
-                    updateToggle()
+
+                    local targetPos = enabled and onPos or offPos
+                    local targetColor = enabled and library.accent or Color3.fromRGB(30, 30, 30)
+                    local targetGlow = enabled and 0.5 or 1
+
+                    utility.tween(knob, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {Position = targetPos})
+                    utility.tween(track, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {BackgroundColor3 = targetColor})
+                    utility.tween(glow, {0.3}, {Transparency = targetGlow})
+
                     library.flags[flag] = enabled
                     if callback then
                         callback(enabled)
                     end
                 end)
-
-                updateToggle() -- initial state
             end
 
             function sectionActions:Textbox(text, flag, placeholder, callback)
@@ -668,7 +662,9 @@ function library:Window(name)
                 utility.stroke(box, Color3.fromRGB(50, 50, 50), 1)
                 box.FocusLost:Connect(function()
                     library.flags[flag] = box.Text
-                    callback(box.Text)
+                    if callback then
+                        callback(box.Text)
+                    end
                 end)
             end
 
@@ -758,7 +754,9 @@ function library:Window(name)
                         listFrame.Visible = false
                         listFrame.Size = UDim2.new(1, 0, 0, 0)
                         library.flags[flag] = v
-                        callback(v)
+                        if callback then
+                            callback(v)
+                        end
                     end)
                 end
             end
@@ -826,7 +824,9 @@ function library:Window(name)
                     utility.tween(fill, {0.1}, {Size = UDim2.new(perc, 0, 1, 0)})
                     val.Text = string.format("%.2f", value)
                     library.flags[flag] = value
-                    callback(value)
+                    if callback then
+                        callback(value)
+                    end
                 end
 
                 local dragging = false
@@ -859,7 +859,11 @@ function library:Window(name)
                     Parent = items
                 })
                 utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
-                btn.MouseButton1Click:Connect(callback)
+                btn.MouseButton1Click:Connect(function()
+                    if callback then
+                        callback()
+                    end
+                end)
             end
 
             return sectionActions
@@ -886,9 +890,10 @@ function library:Window(name)
                     end
                 end
                 
-                col.CanvasPosition = Vector2.new(0, 0)
+                col.CanvasPosition = Vector2.new(0, 0)  -- Reset scroll
             end
             
+            -- Update canvas sizes after filter (delay for layout to settle)
             task.delay(0.05, function()
                 if currentTab.LeftCol then
                     local leftList = currentTab.LeftCol:FindFirstChild("UIListLayout")
