@@ -302,13 +302,23 @@ function library:Window(name)
         Parent = topBar
     })
 
+    local tabBar = utility.create("Frame", {
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 0, 50),
+        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = mainBG
+    })
+    utility.stroke(tabBar, Color3.fromRGB(40, 40, 40), 1)
+
     local tabContainer = utility.create("ScrollingFrame", {
-        Size = UDim2.new(1, -410, 1, 0),
-        Position = UDim2.new(0, 180, 0, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
         BackgroundTransparency = 1,
         ZIndex = 3,
         ClipsDescendants = true,
-        Parent = topBar,
+        Parent = tabBar,
         ScrollBarThickness = 0,
         ScrollingDirection = Enum.ScrollingDirection.X,
         AutomaticCanvasSize = Enum.AutomaticSize.X,
@@ -364,8 +374,8 @@ function library:Window(name)
     })
 
     local content = utility.create("Frame", {
-        Size = UDim2.new(1, -20, 1, -80),
-        Position = UDim2.new(0, 10, 0, 65),
+        Size = UDim2.new(1, -20, 1, -100),
+        Position = UDim2.new(0, 10, 0, 95),
         BackgroundTransparency = 1,
         ZIndex = 2,
         Parent = mainBG
