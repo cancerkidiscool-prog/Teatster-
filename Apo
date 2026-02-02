@@ -194,8 +194,8 @@ function library:Window(name)
 
     local holder = utility.create("Frame", {
         Name = "Holder",
-        Size = UDim2.new(0, 550, 0, 450),
-        Position = UDim2.new(0.5, -275, 0.5, -225),
+        Size = UDim2.new(0, 550, 0, 500),
+        Position = UDim2.new(0.5, -275, 0.5, -250),
         BackgroundColor3 = Color3.fromRGB(10, 10, 10),
         BorderSizePixel = 0,
         Parent = gui
@@ -809,15 +809,14 @@ function library:Window(name)
                 })
 
                 local bg = utility.create("TextButton", {
-                    Size = UDim2.new(1, -50, 0, 5),
-                    Position = UDim2.new(0, 0, 0.5, -2.5),
+                    Size = UDim2.new(1, 0, 0, 20),
+                    Position = UDim2.new(0, 0, 0.5, -10),
                     BackgroundColor3 = Color3.fromRGB(25, 25, 25),
                     Text = "",
                     ZIndex = 7,
                     Parent = sliderBar
                 })
                 utility.stroke(bg, Color3.fromRGB(50, 50, 50), 1)
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 3), Parent = bg})
                 bg.ClipsDescendants = true
 
                 local fill = utility.create("Frame", {
@@ -827,20 +826,19 @@ function library:Window(name)
                     ZIndex = 8,
                     Parent = bg
                 })
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 3), Parent = fill})
 
                 local val = utility.create("TextLabel", {
-                    Size = UDim2.new(0, 45, 0, 20),
-                    Position = UDim2.new(1, -45, 0.5, -10),
-                    AnchorPoint = Vector2.new(0, 0.5),
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    Size = UDim2.new(0, 80, 1, 0),
+                    Position = UDim2.new(1, -5, 0.5, 0),
                     BackgroundTransparency = 1,
                     Text = string.format("%.1f/%.1f", default, max),
-                    TextColor3 = Color3.fromRGB(220, 220, 220),
+                    TextColor3 = Color3.fromRGB(255, 255, 255),
                     TextSize = 13,
                     Font = Enum.Font.Code,
                     TextXAlignment = Enum.TextXAlignment.Right,
                     ZIndex = 9,
-                    Parent = sliderBar
+                    Parent = bg
                 })
 
                 local function update(input)
