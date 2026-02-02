@@ -194,14 +194,17 @@ function library:Window(name)
 
     local holder = utility.create("Frame", {
         Name = "Holder",
-        Size = UDim2.new(0, 650, 0, 350),
-        Position = UDim2.new(0.5, -325, 0.5, -175),
+        Size = UDim2.new(0, 550, 0, 450),
+        Position = UDim2.new(0.5, -275, 0.5, -225),
         BackgroundColor3 = Color3.fromRGB(10, 10, 10),
         BorderSizePixel = 0,
         Parent = gui
     })
     holder.ClipsDescendants = true
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 12), Parent = holder})
+    utility.create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = holder
+    })
 
     -- TOGGLE GUI / WATERMARK
     local toggleGui = Instance.new("ScreenGui")
@@ -260,29 +263,6 @@ function library:Window(name)
 
     utility.dragify(toggleBtn, toggleBtn)
 
-    local border = utility.create("Frame", {
-        Size = UDim2.new(1, 4, 1, 4),
-        Position = UDim2.new(0, -2, 0, -2),
-        BackgroundColor3 = Color3.fromRGB(255,255,255),
-        BorderSizePixel = 0,
-        ZIndex = 0,
-        Parent = holder
-    })
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 12), Parent = border})
-    local borderGradient = utility.create("UIGradient", {
-        Rotation = 0,
-        Color = utility.gradient(library.outline),
-        Parent = border
-    })
-
-    task.spawn(function()
-        while true do
-            utility.tween(borderGradient, {4, Enum.EasingStyle.Linear}, {Rotation = 360})
-            wait(4)
-            borderGradient.Rotation = 0
-        end
-    end)
-
     local mainBG = utility.create("Frame", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = Color3.fromRGB(15, 15, 15),
@@ -290,7 +270,10 @@ function library:Window(name)
         ZIndex = 1,
         Parent = holder
     })
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 12), Parent = mainBG})
+    utility.create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = mainBG
+    })
 
     local topBar = utility.create("Frame", {
         Size = UDim2.new(1, 0, 0, 50),
@@ -300,6 +283,10 @@ function library:Window(name)
         Parent = mainBG
     })
     utility.stroke(topBar, Color3.fromRGB(40, 40, 40), 1)
+    utility.create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = topBar
+    })
 
     utility.create("TextLabel", {
         Size = UDim2.new(0, 160, 1, 0),
@@ -529,7 +516,10 @@ function library:Window(name)
                 Parent = targetCol
             })
             utility.stroke(sectionFrame, Color3.fromRGB(40, 40, 40), 1)
-            utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = sectionFrame})
+            utility.create("UICorner", {
+                CornerRadius = UDim.new(0, 8),
+                Parent = sectionFrame
+            })
 
             utility.create("TextLabel", {
                 Size = UDim2.new(1, -2, 0, 25),
@@ -819,14 +809,15 @@ function library:Window(name)
                 })
 
                 local bg = utility.create("TextButton", {
-                    Size = UDim2.new(1, -50, 0, 8),
-                    Position = UDim2.new(0, 0, 0.5, -4),
+                    Size = UDim2.new(1, -50, 0, 5),
+                    Position = UDim2.new(0, 0, 0.5, -2.5),
                     BackgroundColor3 = Color3.fromRGB(25, 25, 25),
                     Text = "",
                     ZIndex = 7,
                     Parent = sliderBar
                 })
                 utility.stroke(bg, Color3.fromRGB(50, 50, 50), 1)
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 3), Parent = bg})
                 bg.ClipsDescendants = true
 
                 local fill = utility.create("Frame", {
@@ -836,6 +827,7 @@ function library:Window(name)
                     ZIndex = 8,
                     Parent = bg
                 })
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 3), Parent = fill})
 
                 local val = utility.create("TextLabel", {
                     Size = UDim2.new(0, 45, 0, 20),
