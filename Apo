@@ -194,8 +194,8 @@ function library:Window(name)
 
     local holder = utility.create("Frame", {
         Name = "Holder",
-        Size = UDim2.new(0, 550, 0, 500),
-        Position = UDim2.new(0.5, -275, 0.5, -250),
+        Size = UDim2.new(0, 550, 0, 600),
+        Position = UDim2.new(0.5, -275, 0.5, -300),
         BackgroundColor3 = Color3.fromRGB(10, 10, 10),
         BorderSizePixel = 0,
         Parent = gui
@@ -302,19 +302,24 @@ function library:Window(name)
         Parent = topBar
     })
 
-    local tabContainer = utility.create("Frame", {
-        Size = UDim2.new(1, -160, 1, 0),
-        Position = UDim2.new(0, 150, 0, 0),
+    local tabContainer = utility.create("ScrollingFrame", {
+        Size = UDim2.new(1, -410, 1, 0),
+        Position = UDim2.new(0, 180, 0, 0),
         BackgroundTransparency = 1,
         ZIndex = 3,
         ClipsDescendants = true,
-        Parent = topBar
+        Parent = topBar,
+        ScrollBarThickness = 0,
+        ScrollingDirection = Enum.ScrollingDirection.X,
+        AutomaticCanvasSize = Enum.AutomaticSize.X,
+        CanvasSize = UDim2.new(0, 0, 0, 0)
     })
     utility.create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
         SortOrder = Enum.SortOrder.LayoutOrder,
         Padding = UDim.new(0, 15),
         VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
         Parent = tabContainer
     })
 
@@ -828,15 +833,15 @@ function library:Window(name)
                 })
 
                 local val = utility.create("TextLabel", {
-                    AnchorPoint = Vector2.new(1, 0.5),
-                    Size = UDim2.new(0, 80, 1, 0),
-                    Position = UDim2.new(1, -5, 0.5, 0),
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Size = UDim2.new(1, 0, 1, 0),
+                    Position = UDim2.new(0.5, 0, 0.5, 0),
                     BackgroundTransparency = 1,
                     Text = string.format("%.1f/%.1f", default, max),
                     TextColor3 = Color3.fromRGB(255, 255, 255),
                     TextSize = 13,
                     Font = Enum.Font.Code,
-                    TextXAlignment = Enum.TextXAlignment.Right,
+                    TextXAlignment = Enum.TextXAlignment.Center,
                     ZIndex = 9,
                     Parent = bg
                 })
