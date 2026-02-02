@@ -841,13 +841,18 @@ function library:Window(name)
                     ZIndex = 8,
                     Parent = bg
                 })
+                local fillGradient = utility.create("UIGradient", {
+                    Color = utility.gradient(library.outline),
+                    Rotation = 0,
+                    Parent = fill
+                })
 
                 local val = utility.create("TextLabel", {
                     AnchorPoint = Vector2.new(0.5, 0.5),
                     Size = UDim2.new(1, 0, 1, 0),
                     Position = UDim2.new(0.5, 0, 0.5, 0),
                     BackgroundTransparency = 1,
-                    Text = string.format("%.1f/%.1f", default, max),
+                    Text = string.format("%.2f/%.2f", default, max),
                     TextColor3 = Color3.fromRGB(255, 255, 255),
                     TextSize = 13,
                     Font = Enum.Font.Code,
@@ -859,9 +864,9 @@ function library:Window(name)
                 local function update(input)
                     local perc = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
                     local rawValue = min + (max - min) * perc
-                    local value = tonumber(string.format("%.1f", rawValue))
+                    local value = tonumber(string.format("%.2f", rawValue))
                     utility.tween(fill, {0.1}, {Size = UDim2.new(perc, 0, 1, 0)})
-                    val.Text = string.format("%.1f/%.1f", value, max)
+                    val.Text = string.format("%.2f/%.2f", value, max)
                     library.flags[flag] = value
                     if callback then
                         callback(value)
