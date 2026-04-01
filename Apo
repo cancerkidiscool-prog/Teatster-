@@ -17,7 +17,6 @@ local services = setmetatable({}, {
 })
 
 local utility = {}
-
 function utility.create(class, properties)
     local obj = Instance.new(class)
     for prop, v in next, properties do
@@ -25,7 +24,6 @@ function utility.create(class, properties)
     end
     return obj
 end
-
 function utility.gradient(colors)
     local colortbl = {}
     for i, color in next, colors do
@@ -33,13 +31,11 @@ function utility.gradient(colors)
     end
     return ColorSequence.new(colortbl)
 end
-
 function utility.tween(obj, info, props)
     local tween = services.TweenService:Create(obj, TweenInfo.new(unpack(info)), props)
     tween:Play()
     return tween
 end
-
 function utility.stroke(obj, color, thickness)
     local stroke = Instance.new("UIStroke")
     stroke.Color = color or Color3.fromRGB(50,50,50)
@@ -48,17 +44,14 @@ function utility.stroke(obj, color, thickness)
     stroke.Parent = obj
     return stroke
 end
-
 function utility.dragify(object, inputFrame)
     local dragging, dragInput, dragStart, startPos
     local targetInput = inputFrame or object
-
     targetInput.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = object.Position
-
             local connection
             connection = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -96,7 +89,6 @@ if not notifyHolder then
         VerticalAlignment = Enum.VerticalAlignment.Bottom,
         HorizontalAlignment = Enum.HorizontalAlignment.Right
     })
-
     local padding = utility.create("UIPadding", {
         Parent = notifyHolder,
         PaddingBottom = UDim.new(0, 80),
@@ -106,7 +98,6 @@ end
 
 function library:Notify(options)
     if not notifyHolder then return end
-
     local notifyFrame = utility.create("Frame", {
         Size = UDim2.new(0, 300, 0, 0),
         Position = UDim2.new(1, 330, 1, 0),
@@ -117,7 +108,6 @@ function library:Notify(options)
     })
     notifyFrame.AutomaticSize = Enum.AutomaticSize.Y
     utility.stroke(notifyFrame, library.accent, 1)
-
     local border = utility.create("Frame", {
         Size = UDim2.new(1, 4, 1, 4),
         Position = UDim2.new(0, -2, 0, -2),
@@ -131,7 +121,6 @@ function library:Notify(options)
         Color = utility.gradient(library.outline),
         Parent = border
     })
-
     local contentFrame = utility.create("Frame", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = Color3.fromRGB(15, 15, 15),
@@ -139,12 +128,10 @@ function library:Notify(options)
         Parent = notifyFrame
     })
     contentFrame.AutomaticSize = Enum.AutomaticSize.Y
-
     local list = utility.create("UIListLayout", {
         Parent = contentFrame,
         Padding = UDim.new(0, 6)
     })
-
     utility.create("TextLabel", {
         Size = UDim2.new(1, -12, 0, 24),
         Position = UDim2.new(0, 6, 0, 6),
@@ -157,7 +144,6 @@ function library:Notify(options)
         ZIndex = 2,
         Parent = contentFrame
     })
-
     utility.create("TextLabel", {
         Size = UDim2.new(1, -12, 0, 0),
         Position = UDim2.new(0, 6, 0, 0),
@@ -172,11 +158,8 @@ function library:Notify(options)
         ZIndex = 2,
         Parent = contentFrame
     })
-
     local duration = options.Duration or 5
-
     utility.tween(notifyFrame, {0.4, Enum.EasingStyle.Back}, {Position = UDim2.new(1, -10, 1, -10)})
-
     task.spawn(function()
         task.wait(duration)
         utility.tween(notifyFrame, {0.4, Enum.EasingStyle.Quad}, {Position = UDim2.new(1, 330, 1, 0)})
@@ -191,7 +174,6 @@ function library:Window(name)
         Parent = game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"),
         ResetOnSpawn = false
     })
-
     local holder = utility.create("Frame", {
         Name = "Holder",
         Size = UDim2.new(0, 550, 0, 600),
@@ -205,14 +187,12 @@ function library:Window(name)
         CornerRadius = UDim.new(0, 8),
         Parent = holder
     })
-
     -- TOGGLE GUI / WATERMARK
     local toggleGui = Instance.new("ScreenGui")
     toggleGui.Name = "ZalHub_Toggle"
     toggleGui.Parent = game:GetService("CoreGui")
     toggleGui.ResetOnSpawn = false
     toggleGui.DisplayOrder = 999
-
     local toggleBtn = Instance.new("TextButton")
     toggleBtn.Name = "ToggleBtn"
     toggleBtn.Size = UDim2.new(0, 140, 0, 40)
@@ -225,22 +205,17 @@ function library:Window(name)
     toggleBtn.TextSize = 16
     toggleBtn.ZIndex = 100
     toggleBtn.Parent = toggleGui
-
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = toggleBtn
-
     local stroke = Instance.new("UIStroke")
     stroke.Color = library.accent
     stroke.Thickness = 1
     stroke.Parent = toggleBtn
-
     local isOpen = true
-
     local function toggleWindow()
         isOpen = not isOpen
         holder.Visible = isOpen
-
         if isOpen then
             toggleBtn.Text = "ZalHub [ON]"
             toggleBtn.TextColor3 = library.accent
@@ -251,18 +226,14 @@ function library:Window(name)
             stroke.Color = Color3.fromRGB(80, 80, 80)
         end
     end
-
     toggleBtn.MouseButton1Click:Connect(toggleWindow)
-
     services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
             toggleWindow()
         end
     end)
-
     utility.dragify(toggleBtn, toggleBtn)
-
     local mainBG = utility.create("Frame", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = Color3.fromRGB(15, 15, 15),
@@ -274,7 +245,6 @@ function library:Window(name)
         CornerRadius = UDim.new(0, 8),
         Parent = mainBG
     })
-
     local topBar = utility.create("Frame", {
         Size = UDim2.new(1, 0, 0, 50),
         BackgroundColor3 = Color3.fromRGB(20, 20, 20),
@@ -287,7 +257,6 @@ function library:Window(name)
         CornerRadius = UDim.new(0, 8),
         Parent = topBar
     })
-
     utility.create("TextLabel", {
         Size = UDim2.new(0, 160, 1, 0),
         Position = UDim2.new(0, 16, 0, 0),
@@ -301,7 +270,6 @@ function library:Window(name)
         ZIndex = 3,
         Parent = topBar
     })
-
     local tabBar = utility.create("Frame", {
         Size = UDim2.new(1, 0, 0, 40),
         Position = UDim2.new(0, 0, 0, 50),
@@ -311,7 +279,6 @@ function library:Window(name)
         Parent = mainBG
     })
     utility.stroke(tabBar, Color3.fromRGB(40, 40, 40), 1)
-
     local tabContainer = utility.create("ScrollingFrame", {
         Size = UDim2.new(1, 0, 1, 0),
         Position = UDim2.new(0, 10, 0, 0),
@@ -332,7 +299,6 @@ function library:Window(name)
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
         Parent = tabContainer
     })
-
     -- === GLOBAL SEARCH BAR ===
     local searchContainer = utility.create("Frame", {
         Name = "GlobalSearch",
@@ -345,7 +311,6 @@ function library:Window(name)
     })
     utility.stroke(searchContainer, Color3.fromRGB(50, 50, 50), 1)
     utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = searchContainer})
-
     local searchIcon = utility.create("TextLabel", {
         Size = UDim2.new(0, 30, 1, 0),
         BackgroundTransparency = 1,
@@ -356,7 +321,6 @@ function library:Window(name)
         ZIndex = 6,
         Parent = searchContainer
     })
-
     local searchBox = utility.create("TextBox", {
         Size = UDim2.new(1, -35, 1, -6),
         Position = UDim2.new(0, 32, 0, 3),
@@ -372,7 +336,6 @@ function library:Window(name)
         ZIndex = 6,
         Parent = searchContainer
     })
-
     local content = utility.create("Frame", {
         Size = UDim2.new(1, -20, 1, -100),
         Position = UDim2.new(0, 10, 0, 95),
@@ -380,12 +343,9 @@ function library:Window(name)
         ZIndex = 2,
         Parent = mainBG
     })
-
     utility.dragify(holder, topBar)
-
     local currentTab = nil
     local windowActions = {}
-
     function windowActions:Tab(tabName)
         local tabBtn = utility.create("TextButton", {
             Size = UDim2.new(0, 0, 0, 35),
@@ -399,7 +359,6 @@ function library:Window(name)
             ZIndex = 4,
             Parent = tabContainer
         })
-
         local underline = utility.create("Frame", {
             Size = UDim2.new(1, 0, 0, 3),
             Position = UDim2.new(0, 0, 1, 2),
@@ -409,7 +368,6 @@ function library:Window(name)
             ZIndex = 4,
             Parent = tabBtn
         })
-
         local tabFrame = utility.create("Frame", {
             Size = UDim2.new(1, 0, 1, 0),
             BackgroundTransparency = 1,
@@ -418,7 +376,6 @@ function library:Window(name)
             ZIndex = 2,
             Parent = content
         })
-
         local leftCol = utility.create("ScrollingFrame", {
             Size = UDim2.new(0.5, -2, 1, 0),
             Position = UDim2.new(0, 0, 0, 0),
@@ -430,7 +387,6 @@ function library:Window(name)
             Parent = tabFrame
         })
         leftCol.CanvasSize = UDim2.new(0, 0, 0, 1000)
-
         local rightCol = utility.create("ScrollingFrame", {
             Size = UDim2.new(0.5, -2, 1, 0),
             Position = UDim2.new(0.5, 2, 0, 0),
@@ -442,7 +398,6 @@ function library:Window(name)
             Parent = tabFrame
         })
         rightCol.CanvasSize = UDim2.new(0, 0, 0, 1000)
-
         utility.create("UIPadding", {
             Parent = leftCol,
             PaddingLeft = UDim.new(0, 1),
@@ -450,7 +405,6 @@ function library:Window(name)
             PaddingTop = UDim.new(0, 10),
             PaddingBottom = UDim.new(0, 10)
         })
-
         utility.create("UIPadding", {
             Parent = rightCol,
             PaddingLeft = UDim.new(0, 1),
@@ -458,7 +412,6 @@ function library:Window(name)
             PaddingTop = UDim.new(0, 10),
             PaddingBottom = UDim.new(0, 10)
         })
-
         local leftList = utility.create("UIListLayout", {
             FillDirection = Enum.FillDirection.Vertical,
             HorizontalAlignment = Enum.HorizontalAlignment.Left,
@@ -466,7 +419,6 @@ function library:Window(name)
             Padding = UDim.new(0, 10),
             Parent = leftCol
         })
-
         local rightList = utility.create("UIListLayout", {
             FillDirection = Enum.FillDirection.Vertical,
             HorizontalAlignment = Enum.HorizontalAlignment.Left,
@@ -474,15 +426,12 @@ function library:Window(name)
             Padding = UDim.new(0, 10),
             Parent = rightCol
         })
-
         local function updateCanvas()
             leftCol.CanvasSize = UDim2.new(0, 0, 0, leftList.AbsoluteContentSize.Y + 20)
             rightCol.CanvasSize = UDim2.new(0, 0, 0, rightList.AbsoluteContentSize.Y + 20)
         end
-
         leftList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
         rightList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
-
         local function select()
             if currentTab then
                 currentTab.Frame.Visible = false
@@ -490,18 +439,14 @@ function library:Window(name)
                 utility.tween(currentTab.Line, {0.2}, {BackgroundTransparency = 1})
             end
             tabFrame.Visible = true
-
             leftCol.Visible = true
             rightCol.Visible = true
-
             leftCol.CanvasPosition = Vector2.new(0, 0)
             rightCol.CanvasPosition = Vector2.new(0, 0)
-
             updateCanvas()
-
             utility.tween(tabBtn, {0.2}, {TextColor3 = library.accent})
             utility.tween(underline, {0.2}, {BackgroundTransparency = 0})
-            
+           
             currentTab = {
                 Frame = tabFrame,
                 Btn = tabBtn,
@@ -510,17 +455,13 @@ function library:Window(name)
                 RightCol = rightCol
             }
         end
-
         tabBtn.MouseButton1Click:Connect(select)
         if not currentTab then select() end
-
         local tabActions = {}
         local currentSectionIndex = 0
-
         function tabActions:Section(sectionName)
             local targetCol = currentSectionIndex % 2 == 0 and leftCol or rightCol
             currentSectionIndex = currentSectionIndex + 1
-
             local sectionFrame = utility.create("Frame", {
                 Name = "ZalSection",
                 BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -535,7 +476,6 @@ function library:Window(name)
                 CornerRadius = UDim.new(0, 8),
                 Parent = sectionFrame
             })
-
             utility.create("TextLabel", {
                 Size = UDim2.new(1, -2, 0, 25),
                 Position = UDim2.new(0, 1, 0, 0),
@@ -548,7 +488,6 @@ function library:Window(name)
                 ZIndex = 5,
                 Parent = sectionFrame
             })
-
             local items = utility.create("Frame", {
                 Size = UDim2.new(1, -2, 0, 0),
                 Position = UDim2.new(0, 1, 0, 25),
@@ -562,14 +501,11 @@ function library:Window(name)
                 SortOrder = Enum.SortOrder.LayoutOrder,
                 Parent = items
             })
-
             local sectionActions = {}
-
             -- MODIFIED TOGGLE (smaller, matches pic)
             function sectionActions:Toggle(text, flag, defaultOrCallback, callback)
                 local default = false
                 local cb = nil
-
                 if typeof(defaultOrCallback) == "boolean" then
                     default = defaultOrCallback
                     cb = callback
@@ -578,9 +514,7 @@ function library:Window(name)
                 else
                     cb = callback
                 end
-
                 local enabled = default
-
                 local toggle = utility.create("TextButton", {
                     Size = UDim2.new(1, 0, 0, 30),
                     BackgroundTransparency = 1,
@@ -588,7 +522,6 @@ function library:Window(name)
                     ZIndex = 6,
                     Parent = items
                 })
-
                 local textLabel = utility.create("TextLabel", {
                     AnchorPoint = Vector2.new(0, 0.5),
                     Size = UDim2.new(1, -80, 0, 20),
@@ -602,7 +535,6 @@ function library:Window(name)
                     ZIndex = 7,
                     Parent = toggle
                 })
-
                 local track = utility.create("Frame", {
                     Size = UDim2.new(0, 36, 0, 18),
                     Position = UDim2.new(1, -45, 0.5, -9),
@@ -610,41 +542,31 @@ function library:Window(name)
                     ZIndex = 7,
                     Parent = toggle
                 })
-
                 utility.create("UICorner", {CornerRadius = UDim.new(0, 9), Parent = track})
                 utility.stroke(track, Color3.fromRGB(50, 50, 50), 1)
-
                 local knob = utility.create("Frame", {
                     Size = UDim2.new(0, 16, 0, 16),
                     BackgroundColor3 = Color3.new(1, 1, 1),
                     ZIndex = 8,
                     Parent = track
                 })
-
                 utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = knob})
-
                 local padding = 1
                 local offPos = UDim2.new(0, padding, 0.5, -8)
                 local onPos = UDim2.new(1, -(16 + padding), 0.5, -8)
-
                 knob.Position = enabled and onPos or offPos
-
                 toggle.MouseButton1Click:Connect(function()
                     enabled = not enabled
-
                     local targetPos = enabled and onPos or offPos
                     local targetColor = enabled and library.accent or Color3.fromRGB(30, 30, 30)
-
                     utility.tween(knob, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {Position = targetPos})
                     utility.tween(track, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {BackgroundColor3 = targetColor})
-
                     library.flags[flag] = enabled
                     if cb then
                         cb(enabled)
                     end
                 end)
             end
-
             function sectionActions:Textbox(text, flag, placeholder, callback)
                 local textboxFrame = utility.create("Frame", {
                     Size = UDim2.new(1, 0, 0, 50),
@@ -686,8 +608,20 @@ function library:Window(name)
                     end
                 end)
             end
+            -- UPDATED DROPDOWN: now supports multi-selection!
+            -- Usage:
+            -- :Dropdown("Text", "flag", list, callback)          → single select (original behavior)
+            -- :Dropdown("Text", "flag", list, true, callback)   → multi-select
+            function sectionActions:Dropdown(text, flag, list, callbackOrMulti, callback)
+                local multi = false
+                local cb = nil
+                if typeof(callbackOrMulti) == "boolean" then
+                    multi = callbackOrMulti
+                    cb = callback
+                elseif typeof(callbackOrMulti) == "function" then
+                    cb = callbackOrMulti
+                end
 
-            function sectionActions:Dropdown(text, flag, list, callback)
                 local dropdown = utility.create("Frame", {
                     Size = UDim2.new(1, 0, 0, 50),
                     BackgroundTransparency = 1,
@@ -720,7 +654,6 @@ function library:Window(name)
                 })
                 utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
                 utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
-
                 -- Arrow indicator
                 utility.create("TextLabel", {
                     Size = UDim2.new(0, 30, 1, 0),
@@ -733,10 +666,8 @@ function library:Window(name)
                     ZIndex = 8,
                     Parent = btn
                 })
-
                 local maxDropdownHeight = 200
                 local contentHeight = #list * 24
-
                 local listFrame = utility.create("ScrollingFrame", {
                     Size = UDim2.new(1, 0, 0, contentHeight),
                     Position = UDim2.new(0, 0, 1, 4),
@@ -755,12 +686,10 @@ function library:Window(name)
                     Padding = UDim.new(0, 2),
                     Parent = listFrame
                 })
-
                 local opened = false
                 btn.MouseButton1Click:Connect(function()
                     opened = not opened
                     listFrame.Visible = opened
-
                     if opened then
                         listFrame.Size = UDim2.new(1, 0, 0, math.min(contentHeight, maxDropdownHeight))
                         listFrame.CanvasSize = UDim2.new(1, 0, 0, contentHeight)
@@ -770,31 +699,109 @@ function library:Window(name)
                     end
                 end)
 
-                for _, v in next, list do
-                    local item = utility.create("TextButton", {
-                        Size = UDim2.new(1, 0, 0, 24),
-                        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-                        BorderSizePixel = 0,
-                        Text = v,
-                        TextColor3 = Color3.fromRGB(160, 160, 160),
-                        TextSize = 14,
-                        Font = Enum.Font.Code,
-                        ZIndex = 12,
-                        Parent = listFrame
-                    })
-                    item.MouseButton1Click:Connect(function()
-                        btn.Text = v
-                        opened = false
-                        listFrame.Visible = false
-                        listFrame.Size = UDim2.new(1, 0, 0, 0)
-                        library.flags[flag] = v
-                        if callback then
-                            callback(v)
+                if not multi then
+                    -- SINGLE SELECT (original behavior)
+                    for _, v in next, list do
+                        local item = utility.create("TextButton", {
+                            Size = UDim2.new(1, 0, 0, 24),
+                            BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                            BorderSizePixel = 0,
+                            Text = v,
+                            TextColor3 = Color3.fromRGB(160, 160, 160),
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            ZIndex = 12,
+                            Parent = listFrame
+                        })
+                        item.MouseButton1Click:Connect(function()
+                            btn.Text = v
+                            opened = false
+                            listFrame.Visible = false
+                            listFrame.Size = UDim2.new(1, 0, 0, 0)
+                            library.flags[flag] = v
+                            if cb then
+                                cb(v)
+                            end
+                        end)
+                    end
+                else
+                    -- MULTI SELECT (new!)
+                    local selected = library.flags[flag]
+                    if not selected or typeof(selected) ~= "table" then
+                        selected = {}
+                        library.flags[flag] = selected
+                    end
+
+                    local function updateButtonText()
+                        if #selected == 0 then
+                            btn.Text = "Select..."
+                        elseif #selected == 1 then
+                            btn.Text = selected[1]
+                        elseif #selected <= 3 then
+                            btn.Text = table.concat(selected, ", ")
+                        else
+                            btn.Text = #selected .. " selected"
                         end
-                    end)
+                    end
+                    updateButtonText()
+
+                    for _, v in next, list do
+                        local item = utility.create("TextButton", {
+                            Size = UDim2.new(1, 0, 0, 24),
+                            BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                            BorderSizePixel = 0,
+                            Text = "",
+                            TextColor3 = Color3.fromRGB(160, 160, 160),
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            ZIndex = 12,
+                            Parent = listFrame
+                        })
+
+                        local itemText = utility.create("TextLabel", {
+                            Size = UDim2.new(1, -30, 1, 0),
+                            Position = UDim2.new(0, 5, 0, 0),
+                            BackgroundTransparency = 1,
+                            Text = v,
+                            TextColor3 = Color3.fromRGB(160, 160, 160),
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            ZIndex = 13,
+                            Parent = item
+                        })
+
+                        local check = utility.create("TextLabel", {
+                            Size = UDim2.new(0, 20, 1, 0),
+                            Position = UDim2.new(1, -25, 0, 0),
+                            BackgroundTransparency = 1,
+                            Text = "✔",
+                            TextColor3 = library.accent,
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            TextXAlignment = Enum.TextXAlignment.Center,
+                            ZIndex = 13,
+                            Parent = item
+                        })
+                        check.Visible = table.find(selected, v) ~= nil
+
+                        item.MouseButton1Click:Connect(function()
+                            local idx = table.find(selected, v)
+                            if idx then
+                                table.remove(selected, idx)
+                                check.Visible = false
+                            else
+                                table.insert(selected, v)
+                                check.Visible = true
+                            end
+                            updateButtonText()
+                            if cb then
+                                cb(selected)
+                            end
+                        end)
+                    end
                 end
             end
-
             -- MODIFIED SLIDER (thinner bar, value as current/max, matches pic)
             function sectionActions:Slider(text, flag, min, max, default, callback)
                 local slider = utility.create("Frame", {
@@ -803,7 +810,6 @@ function library:Window(name)
                     ZIndex = 6,
                     Parent = items
                 })
-
                 utility.create("TextLabel", {
                     Size = UDim2.new(1, 0, 0, 20),
                     BackgroundTransparency = 1,
@@ -815,14 +821,12 @@ function library:Window(name)
                     ZIndex = 7,
                     Parent = slider
                 })
-
                 local sliderBar = utility.create("Frame", {
                     Size = UDim2.new(1, 0, 0, 20),
                     Position = UDim2.new(0, 0, 0, 20),
                     BackgroundTransparency = 1,
                     Parent = slider
                 })
-
                 local bg = utility.create("TextButton", {
                     Size = UDim2.new(1, 0, 0, 20),
                     Position = UDim2.new(0, 0, 0.5, -10),
@@ -833,7 +837,6 @@ function library:Window(name)
                 })
                 utility.stroke(bg, Color3.fromRGB(50, 50, 50), 1)
                 bg.ClipsDescendants = true
-
                 local fill = utility.create("Frame", {
                     Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
                     BackgroundColor3 = library.accent,
@@ -846,7 +849,6 @@ function library:Window(name)
                     Rotation = 0,
                     Parent = fill
                 })
-
                 local val = utility.create("TextLabel", {
                     AnchorPoint = Vector2.new(0.5, 0.5),
                     Size = UDim2.new(1, 0, 1, 0),
@@ -860,7 +862,6 @@ function library:Window(name)
                     ZIndex = 9,
                     Parent = bg
                 })
-
                 local function update(input)
                     local perc = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
                     local rawValue = min + (max - min) * perc
@@ -872,7 +873,6 @@ function library:Window(name)
                         callback(value)
                     end
                 end
-
                 local dragging = false
                 bg.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -891,7 +891,6 @@ function library:Window(name)
                     end
                 end)
             end
-
             function sectionActions:Button(text, callback)
                 local btn = utility.create("TextButton", {
                     Size = UDim2.new(1, 0, 0, 34),
@@ -912,20 +911,17 @@ function library:Window(name)
                     end
                 end)
             end
-
             return sectionActions
         end
-
         return tabActions
     end
-
     -- Global search logic
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(searchBox.Text)
-        
+       
         if currentTab and currentTab.LeftCol and currentTab.RightCol then
             local cols = {currentTab.LeftCol, currentTab.RightCol}
-            
+           
             for _, col in ipairs(cols) do
                 for _, child in ipairs(col:GetChildren()) do
                     if child.Name == "ZalSection" then
@@ -936,10 +932,10 @@ function library:Window(name)
                         end
                     end
                 end
-                
+               
                 col.CanvasPosition = Vector2.new(0, 0)
             end
-            
+           
             task.delay(0.05, function()
                 if currentTab.LeftCol then
                     local leftList = currentTab.LeftCol:FindFirstChild("UIListLayout")
@@ -956,8 +952,6 @@ function library:Window(name)
             end)
         end
     end)
-
     return windowActions
 end
-
 return library
