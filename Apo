@@ -68,9 +68,10 @@ end
 
 -- Helper: create a text
 function utility.drawText(x, y, text, color, size, font, alignment, zIndex)
-    font = font or Drawing.Fonts.Code
+    text = text or ""                          -- fix for missing text
+    font = font or (Drawing.Fonts and Drawing.Fonts.Code) or 0  -- fallback
     size = size or 14
-    alignment = alignment or 0 -- 0=Left, 1=Center, 2=Right
+    alignment = alignment or 0
     local txt = Drawing.new("Text")
     txt.Position = Vector2.new(x, y)
     txt.Text = text
@@ -81,8 +82,7 @@ function utility.drawText(x, y, text, color, size, font, alignment, zIndex)
     txt.Center = (alignment == 1)
     txt.Outline = false
     if alignment == 2 then
-        -- Right alignment: we can set the X position and rely on text bounds? Drawing Text doesn't have XAlignment. Use manual math later.
-        -- We'll adjust position in actual placement.
+        -- Right alignment: we'll adjust position manually in actual placement.
     end
     if zIndex then txt.ZIndex = zIndex end
     return txt
@@ -128,8 +128,8 @@ function library:Notify(options)
     local y = services.Workspace.CurrentCamera.ViewportSize.Y - 80
     n.bg = utility.drawRect(x, y, 300, 60, Color3.fromRGB(15,15,15), 10)
     n.stroke = utility.drawStroke(x, y, 300, 60, library.accent, 1)
-    n.titleTxt = utility.drawText(x+10, y+8, title, library.accent, 15, Drawing.Fonts.Code, 0, 11)
-    n.contentTxt = utility.drawText(x+10, y+30, content, Color3.fromRGB(200,200,200), 13, Drawing.Fonts.Code, 0, 11)
+    n.titleTxt = utility.drawText(x+10, y+8, title, library.accent, 15, Drawing.Fonts and Drawing.Fonts.Code, 0, 11)
+    n.contentTxt = utility.drawText(x+10, y+30, content, Color3.fromRGB(200,200,200), 13, Drawing.Fonts and Drawing.Fonts.Code, 0, 11)
     n.startTime = tick()
     n.duration = duration
     n.targetY = y
@@ -166,7 +166,7 @@ function library:Window(name)
     local toggleBtn = {
         bg = utility.drawRect(toggleX, toggleY, 140, 40, Color3.fromRGB(15,15,15), 100),
         stroke = utility.drawStroke(toggleX, toggleY, 140, 40, library.accent, 1),
-        text = utility.drawText(toggleX+70, toggleY+20, "ZalHub [ON]", library.accent, 16, Drawing.Fonts.Code, 1, 101),
+        text = utility.drawText(toggleX+70, toggleY+20, "ZalHub [ON]", library.accent, 16, Drawing.Fonts and Drawing.Fonts.Code, 1, 101),
     }
     local toggleState = true
 
@@ -255,7 +255,7 @@ function library:Window(name)
     local winStroke = utility.drawStroke(windowState.x, windowState.y, windowState.width, windowState.height, Color3.fromRGB(40,40,40), 1)
     local topBar = utility.drawRect(windowState.x, windowState.y, windowState.width, 50, Color3.fromRGB(20,20,20), 2)
     local topBarStroke = utility.drawStroke(windowState.x, windowState.y, windowState.width, 50, Color3.fromRGB(40,40,40), 1)
-    local titleText = utility.drawText(windowState.x+16, windowState.y+25, name, library.accent, 18, Drawing.Fonts.Code, 0, 3)
+    local titleText = utility.drawText(windowState.x+16, windowState.y+25, name, library.accent, 18, Drawing.Fonts and Drawing.Fonts.Code, 0, 3)
     local tabBar = utility.drawRect(windowState.x, windowState.y+50, windowState.width, 40, Color3.fromRGB(20,20,20), 2)
     local tabBarStroke = utility.drawStroke(windowState.x, windowState.y+50, windowState.width, 40, Color3.fromRGB(40,40,40), 1)
 
@@ -264,8 +264,8 @@ function library:Window(name)
     local searchY = windowState.y + 9
     local searchBg = utility.drawRect(searchX, searchY, 220, 32, Color3.fromRGB(18,18,18), 5)
     local searchStroke = utility.drawStroke(searchX, searchY, 220, 32, Color3.fromRGB(50,50,50), 1)
-    local searchIcon = utility.drawText(searchX+15, searchY+16, "🔍", Color3.fromRGB(100,100,100), 16, Drawing.Fonts.Code, 1, 6)
-    local searchTextDraw = utility.drawText(searchX+35, searchY+16, "", Color3.fromRGB(200,200,200), 14, Drawing.Fonts.Code, 0, 6)
+    local searchIcon = utility.drawText(searchX+15, searchY+16, "🔍", Color3.fromRGB(100,100,100), 16, Drawing.Fonts and Drawing.Fonts.Code, 1, 6)
+    local searchTextDraw = utility.drawText(searchX+35, searchY+16, "", Color3.fromRGB(200,200,200), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 6)
 
     -- Hidden Roblox TextBox for search input
     local searchBoxInput = Instance.new("TextBox")
@@ -473,7 +473,6 @@ function library:Window(name)
                         table.insert(toRemove, i)
                     end
                 end
-                -- move up as older notifications disappear (simplified)
             end
             for i = #toRemove, 1, -1 do
                 local idx = toRemove[i]
@@ -498,12 +497,7 @@ function library:Window(name)
                 tabBar.Visible = true
             end
 
-            -- Redraw tabs and sections (dynamic)
-            -- We'll clear old dynamic drawings by storing them per tab and removing/redrawing.
-            -- For simplicity, we'll just redraw all elements every frame by removing and recreating the dynamic parts.
-            -- This is easier: keep tables of Drawing objects for each UI element, update positions, or recreate.
-            -- I'll implement a full redraw of content area each frame, using stored state.
-            -- First, remove all previously drawn dynamic items (sections, items).
+            -- Redraw dynamic items
             if windowState._dynamicDrawings then
                 for _, d in ipairs(windowState._dynamicDrawings) do
                     if d then
@@ -529,7 +523,7 @@ function library:Window(name)
                 local y = tabBtnY
                 -- Draw tab button
                 local bg = utility.drawRect(x, y, btnW, btnH, Color3.fromRGB(0,0,0,0), 4) -- transparent bg
-                local txt = utility.drawText(x+btnW/2, y+btnH/2, tab.name, tab.active and library.accent or Color3.fromRGB(120,120,120), 15, Drawing.Fonts.Code, 1, 5)
+                local txt = utility.drawText(x+btnW/2, y+btnH/2, tab.name, tab.active and library.accent or Color3.fromRGB(120,120,120), 15, Drawing.Fonts and Drawing.Fonts.Code, 1, 5)
                 table.insert(dyn, bg)
                 table.insert(dyn, txt)
                 if tab.active then
@@ -558,16 +552,14 @@ function library:Window(name)
                 local yPos = colY
                 for _, sec in ipairs(leftSections) do
                     local secW = windowState.width/2 - 12
-                    -- Measure section height: title 25 + items count* itemH
                     local itemCount = #sec.items
-                    local secH = 25 + itemCount * 30 + (itemCount>0 and 10 or 0) -- approx
+                    local secH = 25 + itemCount * 30 + (itemCount>0 and 10 or 0)
                     local bg = utility.drawRect(leftColX, yPos, secW, secH, Color3.fromRGB(18,18,18), 4)
                     local stroke = utility.drawStroke(leftColX, yPos, secW, secH, Color3.fromRGB(40,40,40), 1)
-                    local title = utility.drawText(leftColX+5, yPos+12, sec.name:upper(), library.accent, 15, Drawing.Fonts.Code, 0, 5)
+                    local title = utility.drawText(leftColX+5, yPos+12, sec.name:upper(), library.accent, 15, Drawing.Fonts and Drawing.Fonts.Code, 0, 5)
                     table.insert(dyn, bg)
                     for _, l in ipairs(stroke) do table.insert(dyn, l) end
                     table.insert(dyn, title)
-                    -- Draw items
                     local itemY = yPos + 25
                     for _, item in ipairs(sec.items) do
                         local itemH = 30
@@ -577,8 +569,7 @@ function library:Window(name)
                         end
                         if item.type == "Toggle" then
                             local bgItem = utility.drawRect(leftColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local txt = utility.drawText(leftColX+15, itemY+15, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts.Code, 0, 7)
-                            -- track
+                            local txt = utility.drawText(leftColX+15, itemY+15, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local trackX = leftColX + secW - 45
                             local trackY = itemY + 6
                             local trackW = 36
@@ -586,7 +577,6 @@ function library:Window(name)
                             local trackColor = item.enabled and library.accent or Color3.fromRGB(30,30,30)
                             local track = utility.drawRect(trackX, trackY, trackW, trackH, trackColor, 7)
                             local trackStroke = utility.drawStroke(trackX, trackY, trackW, trackH, Color3.fromRGB(50,50,50), 1)
-                            -- knob
                             local knobX = item.enabled and (trackX + trackW - 16 - 1) or (trackX + 1)
                             local knob = utility.drawRect(knobX, trackY+1, 16, 16, Color3.new(1,1,1), 8)
                             table.insert(dyn, bgItem)
@@ -594,19 +584,18 @@ function library:Window(name)
                             table.insert(dyn, track)
                             for _, l in ipairs(trackStroke) do table.insert(dyn, l) end
                             table.insert(dyn, knob)
-                            -- Store hitbox for interaction
                             item._hitbox = {x=leftColX, y=itemY, w=secW, h=itemH}
                             item._drawings = {knob=knob, track=track, trackStroke=trackStroke}
                         elseif item.type == "Textbox" then
                             local bgItem = utility.drawRect(leftColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local label = utility.drawText(leftColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts.Code, 0, 7)
+                            local label = utility.drawText(leftColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local boxX = leftColX+5
                             local boxY = itemY+22
                             local boxW = secW-10
                             local boxH = 24
                             local boxBg = utility.drawRect(boxX, boxY, boxW, boxH, Color3.fromRGB(25,25,25), 7)
                             local boxStroke = utility.drawStroke(boxX, boxY, boxW, boxH, Color3.fromRGB(50,50,50), 1)
-                            local boxText = utility.drawText(boxX+5, boxY+12, item.value ~= "" and item.value or item.placeholder, item.value ~= "" and Color3.fromRGB(220,220,220) or Color3.fromRGB(80,80,80), 14, Drawing.Fonts.Code, 0, 8)
+                            local boxText = utility.drawText(boxX+5, boxY+12, item.value ~= "" and item.value or item.placeholder, item.value ~= "" and Color3.fromRGB(220,220,220) or Color3.fromRGB(80,80,80), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 8)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, label)
                             table.insert(dyn, boxBg)
@@ -614,7 +603,6 @@ function library:Window(name)
                             table.insert(dyn, boxText)
                             item._hitbox = {x=boxX, y=boxY, w=boxW, h=boxH}
                             item._drawings = {boxBg=boxBg, boxText=boxText}
-                            -- Position hidden TextBox
                             if item.inputObj then
                                 item.inputObj.Position = UDim2.new(0, boxX, 0, boxY)
                                 item.inputObj.Size = UDim2.new(0, boxW, 0, boxH)
@@ -622,7 +610,7 @@ function library:Window(name)
                             end
                         elseif item.type == "Dropdown" then
                             local bgItem = utility.drawRect(leftColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local label = utility.drawText(leftColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts.Code, 0, 7)
+                            local label = utility.drawText(leftColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local btnX = leftColX+5
                             local btnY = itemY+22
                             local btnW = secW-10
@@ -638,8 +626,8 @@ function library:Window(name)
                                 elseif #sel <= 3 then selectedText = table.concat(sel, ", ")
                                 else selectedText = #sel .. " selected" end
                             end
-                            local btnTxt = utility.drawText(btnX+5, btnY+12, selectedText, Color3.fromRGB(200,200,200), 14, Drawing.Fonts.Code, 0, 8)
-                            local arrow = utility.drawText(btnX+btnW-20, btnY+12, "▼", Color3.fromRGB(120,120,120), 14, Drawing.Fonts.Code, 0, 8)
+                            local btnTxt = utility.drawText(btnX+5, btnY+12, selectedText, Color3.fromRGB(200,200,200), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 8)
+                            local arrow = utility.drawText(btnX+btnW-20, btnY+12, "▼", Color3.fromRGB(120,120,120), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 8)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, label)
                             table.insert(dyn, btnBg)
@@ -648,7 +636,6 @@ function library:Window(name)
                             table.insert(dyn, arrow)
                             item._hitbox = {x=btnX, y=btnY, w=btnW, h=btnH}
                             item._drawings = {btnBg=btnBg, btnTxt=btnTxt}
-                            -- Draw dropdown list if opened
                             if item.opened then
                                 local listY = btnY + btnH + 4
                                 local listH = #item.list * 24
@@ -659,15 +646,14 @@ function library:Window(name)
                                 local itemListY = listY
                                 for _, opt in ipairs(item.list) do
                                     local optBg = utility.drawRect(btnX, itemListY, btnW, 24, Color3.fromRGB(20,20,20), 12)
-                                    local optTxt = utility.drawText(btnX+5, itemListY+12, opt, Color3.fromRGB(160,160,160), 14, Drawing.Fonts.Code, 0, 13)
+                                    local optTxt = utility.drawText(btnX+5, itemListY+12, opt, Color3.fromRGB(160,160,160), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 13)
                                     table.insert(dyn, optBg)
                                     table.insert(dyn, optTxt)
-                                    -- Store hitbox for list item
                                     opt._hitbox = {x=btnX, y=itemListY, w=btnW, h=24}
                                     if item.multi then
                                         local check = table.find(item.selected, opt) ~= nil
                                         if check then
-                                            local checkMark = utility.drawText(btnX+btnW-25, itemListY+12, "✔", library.accent, 14, Drawing.Fonts.Code, 0, 13)
+                                            local checkMark = utility.drawText(btnX+btnW-25, itemListY+12, "✔", library.accent, 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 13)
                                             table.insert(dyn, checkMark)
                                         end
                                     end
@@ -676,7 +662,7 @@ function library:Window(name)
                             end
                         elseif item.type == "Slider" then
                             local bgItem = utility.drawRect(leftColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local label = utility.drawText(leftColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts.Code, 0, 7)
+                            local label = utility.drawText(leftColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local barX = leftColX+5
                             local barY = itemY+20
                             local barW = secW-10
@@ -686,7 +672,7 @@ function library:Window(name)
                             local perc = (item.value - item.min) / (item.max - item.min)
                             local fillW = math.max(0, barW * perc)
                             local fill = utility.drawRect(barX, barY, fillW, barH, library.accent, 8)
-                            local valText = utility.drawText(barX+barW/2, barY+barH/2, string.format("%.2f/%.2f", item.value, item.max), Color3.new(1,1,1), 13, Drawing.Fonts.Code, 1, 9)
+                            local valText = utility.drawText(barX+barW/2, barY+barH/2, string.format("%.2f/%.2f", item.value, item.max), Color3.new(1,1,1), 13, Drawing.Fonts and Drawing.Fonts.Code, 1, 9)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, label)
                             table.insert(dyn, barBg)
@@ -703,7 +689,7 @@ function library:Window(name)
                             local btnH = 34
                             local btnBg = utility.drawRect(btnX, btnY, btnW, btnH, Color3.fromRGB(25,25,25), 7)
                             local btnStroke = utility.drawStroke(btnX, btnY, btnW, btnH, Color3.fromRGB(50,50,50), 1)
-                            local btnTxt = utility.drawText(btnX+btnW/2, btnY+btnH/2, item.text, Color3.fromRGB(200,200,200), 14, Drawing.Fonts.Code, 1, 8)
+                            local btnTxt = utility.drawText(btnX+btnW/2, btnY+btnH/2, item.text, Color3.fromRGB(200,200,200), 14, Drawing.Fonts and Drawing.Fonts.Code, 1, 8)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, btnBg)
                             for _, l in ipairs(btnStroke) do table.insert(dyn, l) end
@@ -714,7 +700,7 @@ function library:Window(name)
                     end
                     yPos = yPos + secH + 10
                 end
-                -- Right column similar (clone logic but x = rightColX)
+                -- Right column (same logic with rightColX)
                 yPos = colY
                 for _, sec in ipairs(rightSections) do
                     local secW = windowState.width/2 - 12
@@ -722,7 +708,7 @@ function library:Window(name)
                     local secH = 25 + itemCount * 30 + (itemCount>0 and 10 or 0)
                     local bg = utility.drawRect(rightColX, yPos, secW, secH, Color3.fromRGB(18,18,18), 4)
                     local stroke = utility.drawStroke(rightColX, yPos, secW, secH, Color3.fromRGB(40,40,40), 1)
-                    local title = utility.drawText(rightColX+5, yPos+12, sec.name:upper(), library.accent, 15, Drawing.Fonts.Code, 0, 5)
+                    local title = utility.drawText(rightColX+5, yPos+12, sec.name:upper(), library.accent, 15, Drawing.Fonts and Drawing.Fonts.Code, 0, 5)
                     table.insert(dyn, bg)
                     for _, l in ipairs(stroke) do table.insert(dyn, l) end
                     table.insert(dyn, title)
@@ -732,10 +718,9 @@ function library:Window(name)
                         if item.type == "Textbox" then itemH = 50
                         elseif item.type == "Dropdown" then itemH = 50
                         elseif item.type == "Slider" then itemH = 40 end
-                        -- Same drawing logic as left but with rightColX
                         if item.type == "Toggle" then
                             local bgItem = utility.drawRect(rightColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local txt = utility.drawText(rightColX+15, itemY+15, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts.Code, 0, 7)
+                            local txt = utility.drawText(rightColX+15, itemY+15, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local trackX = rightColX + secW - 45
                             local trackY = itemY + 6
                             local trackW = 36
@@ -754,14 +739,14 @@ function library:Window(name)
                             item._drawings = {knob=knob, track=track, trackStroke=trackStroke}
                         elseif item.type == "Textbox" then
                             local bgItem = utility.drawRect(rightColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local label = utility.drawText(rightColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts.Code, 0, 7)
+                            local label = utility.drawText(rightColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local boxX = rightColX+5
                             local boxY = itemY+22
                             local boxW = secW-10
                             local boxH = 24
                             local boxBg = utility.drawRect(boxX, boxY, boxW, boxH, Color3.fromRGB(25,25,25), 7)
                             local boxStroke = utility.drawStroke(boxX, boxY, boxW, boxH, Color3.fromRGB(50,50,50), 1)
-                            local boxText = utility.drawText(boxX+5, boxY+12, item.value ~= "" and item.value or item.placeholder, item.value ~= "" and Color3.fromRGB(220,220,220) or Color3.fromRGB(80,80,80), 14, Drawing.Fonts.Code, 0, 8)
+                            local boxText = utility.drawText(boxX+5, boxY+12, item.value ~= "" and item.value or item.placeholder, item.value ~= "" and Color3.fromRGB(220,220,220) or Color3.fromRGB(80,80,80), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 8)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, label)
                             table.insert(dyn, boxBg)
@@ -776,7 +761,7 @@ function library:Window(name)
                             end
                         elseif item.type == "Dropdown" then
                             local bgItem = utility.drawRect(rightColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local label = utility.drawText(rightColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts.Code, 0, 7)
+                            local label = utility.drawText(rightColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local btnX = rightColX+5
                             local btnY = itemY+22
                             local btnW = secW-10
@@ -792,8 +777,8 @@ function library:Window(name)
                                 elseif #sel <= 3 then selectedText = table.concat(sel, ", ")
                                 else selectedText = #sel .. " selected" end
                             end
-                            local btnTxt = utility.drawText(btnX+5, btnY+12, selectedText, Color3.fromRGB(200,200,200), 14, Drawing.Fonts.Code, 0, 8)
-                            local arrow = utility.drawText(btnX+btnW-20, btnY+12, "▼", Color3.fromRGB(120,120,120), 14, Drawing.Fonts.Code, 0, 8)
+                            local btnTxt = utility.drawText(btnX+5, btnY+12, selectedText, Color3.fromRGB(200,200,200), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 8)
+                            local arrow = utility.drawText(btnX+btnW-20, btnY+12, "▼", Color3.fromRGB(120,120,120), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 8)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, label)
                             table.insert(dyn, btnBg)
@@ -812,14 +797,14 @@ function library:Window(name)
                                 local itemListY = listY
                                 for _, opt in ipairs(item.list) do
                                     local optBg = utility.drawRect(btnX, itemListY, btnW, 24, Color3.fromRGB(20,20,20), 12)
-                                    local optTxt = utility.drawText(btnX+5, itemListY+12, opt, Color3.fromRGB(160,160,160), 14, Drawing.Fonts.Code, 0, 13)
+                                    local optTxt = utility.drawText(btnX+5, itemListY+12, opt, Color3.fromRGB(160,160,160), 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 13)
                                     table.insert(dyn, optBg)
                                     table.insert(dyn, optTxt)
                                     opt._hitbox = {x=btnX, y=itemListY, w=btnW, h=24}
                                     if item.multi then
                                         local check = table.find(item.selected, opt) ~= nil
                                         if check then
-                                            local checkMark = utility.drawText(btnX+btnW-25, itemListY+12, "✔", library.accent, 14, Drawing.Fonts.Code, 0, 13)
+                                            local checkMark = utility.drawText(btnX+btnW-25, itemListY+12, "✔", library.accent, 14, Drawing.Fonts and Drawing.Fonts.Code, 0, 13)
                                             table.insert(dyn, checkMark)
                                         end
                                     end
@@ -828,7 +813,7 @@ function library:Window(name)
                             end
                         elseif item.type == "Slider" then
                             local bgItem = utility.drawRect(rightColX, itemY, secW, itemH, Color3.fromRGB(0,0,0,0), 6)
-                            local label = utility.drawText(rightColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts.Code, 0, 7)
+                            local label = utility.drawText(rightColX+5, itemY+5, item.text, Color3.fromRGB(180,180,180), 13, Drawing.Fonts and Drawing.Fonts.Code, 0, 7)
                             local barX = rightColX+5
                             local barY = itemY+20
                             local barW = secW-10
@@ -838,7 +823,7 @@ function library:Window(name)
                             local perc = (item.value - item.min) / (item.max - item.min)
                             local fillW = math.max(0, barW * perc)
                             local fill = utility.drawRect(barX, barY, fillW, barH, library.accent, 8)
-                            local valText = utility.drawText(barX+barW/2, barY+barH/2, string.format("%.2f/%.2f", item.value, item.max), Color3.new(1,1,1), 13, Drawing.Fonts.Code, 1, 9)
+                            local valText = utility.drawText(barX+barW/2, barY+barH/2, string.format("%.2f/%.2f", item.value, item.max), Color3.new(1,1,1), 13, Drawing.Fonts and Drawing.Fonts.Code, 1, 9)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, label)
                             table.insert(dyn, barBg)
@@ -855,7 +840,7 @@ function library:Window(name)
                             local btnH = 34
                             local btnBg = utility.drawRect(btnX, btnY, btnW, btnH, Color3.fromRGB(25,25,25), 7)
                             local btnStroke = utility.drawStroke(btnX, btnY, btnW, btnH, Color3.fromRGB(50,50,50), 1)
-                            local btnTxt = utility.drawText(btnX+btnW/2, btnY+btnH/2, item.text, Color3.fromRGB(200,200,200), 14, Drawing.Fonts.Code, 1, 8)
+                            local btnTxt = utility.drawText(btnX+btnW/2, btnY+btnH/2, item.text, Color3.fromRGB(200,200,200), 14, Drawing.Fonts and Drawing.Fonts.Code, 1, 8)
                             table.insert(dyn, bgItem)
                             table.insert(dyn, btnBg)
                             for _, l in ipairs(btnStroke) do table.insert(dyn, l) end
@@ -901,7 +886,6 @@ function library:Window(name)
                                 if item.callback then item.callback() end
                             elseif item.type == "Dropdown" then
                                 item.opened = not item.opened
-                                -- close other dropdowns
                                 for _, sec2 in ipairs(windowState.currentTab.sections) do
                                     for _, it2 in ipairs(sec2.items) do
                                         if it2 ~= item and it2.type == "Dropdown" then
@@ -912,7 +896,6 @@ function library:Window(name)
                             end
                             return
                         end
-                        -- Check dropdown list items if opened
                         if item.type == "Dropdown" and item.opened then
                             for _, opt in ipairs(item.list) do
                                 if opt._hitbox and isInRect(mx, my, opt._hitbox.x, opt._hitbox.y, opt._hitbox.w, opt._hitbox.h) then
@@ -933,10 +916,8 @@ function library:Window(name)
                                     return
                                 end
                             end
-                            -- click outside closes dropdown
                             item.opened = false
                         end
-                        -- Textbox focus: handled by hidden TextBox click, but we need to focus it on click
                         if item.type == "Textbox" and item.inputObj then
                             item.inputObj:CaptureFocus()
                         end
