@@ -1,1437 +1,957 @@
---[[
-    ╔══════════════════════════════════════════════════════════╗
-    ║  ZalHub v4.1 | CS:GO Elite Edition                      ║
-    ║  Sharp, clean, professional, information-dense          ║
-    ║  Pop‑out pickers, full HSV + alpha color, keybind modes ║
-    ║  Overlay‑layered, scrollable, searchable                ║
-    ╚══════════════════════════════════════════════════════════╝
-]]
+repeat
+    wait()
+until game:IsLoaded()
 
-repeat task.wait() until game:IsLoaded()
-
-local ZalHub = {
+local library = {
     flags = {},
-    callbacks = {},
-    connections = {},
-    unloaded = false,
-    accent = Color3.fromRGB(76, 175, 80),
-    accentHover = Color3.fromRGB(100, 200, 105),
-    accentDim = Color3.fromRGB(50, 130, 55),
-    theme = {
-        windowBg     = Color3.fromRGB(30, 30, 30),
-        panelBg      = Color3.fromRGB(36, 36, 36),
-        headerBg     = Color3.fromRGB(42, 42, 42),
-        elementBg    = Color3.fromRGB(48, 48, 48),
-        elementHover = Color3.fromRGB(55, 55, 55),
-        inputBg      = Color3.fromRGB(24, 24, 24),
-        border       = Color3.fromRGB(58, 58, 58),
-        borderDark   = Color3.fromRGB(20, 20, 20),
-        separator    = Color3.fromRGB(50, 50, 50),
-        text         = Color3.fromRGB(220, 220, 220),
-        textSub      = Color3.fromRGB(160, 160, 160),
-        textDim      = Color3.fromRGB(100, 100, 100),
-        scrollbar    = Color3.fromRGB(70, 70, 70),
-        danger       = Color3.fromRGB(200, 60, 60),
-        warning      = Color3.fromRGB(220, 180, 40),
-    }
+    -- Rich Deep Violet Theme
+    accent = Color3.fromRGB(117, 52, 235),
+    outline = { Color3.fromRGB(117, 52, 235), Color3.fromRGB(200, 100, 255) },
+    toggled = true,
 }
 
-local Services = setmetatable({}, {__index = function(_, s) return game:GetService(s) end})
-local UIS = Services.UserInputService
-local TweenService = Services.TweenService
-local RunService = Services.RunService
-local CoreGui = Services.CoreGui
-local Players = Services.Players
-
--- ════════════════════════════════════════════════════════════
--- UTILITY
--- ════════════════════════════════════════════════════════════
-local U = {}
-
-function U.new(class, props)
-    local obj = Instance.new(class)
-    for k, v in next, props do
-        if k ~= "Parent" then obj[k] = v end
+local services = setmetatable({}, {
+    __index = function(_, service)
+        return game:GetService(service)
     end
-    if props.Parent then obj.Parent = props.Parent end
+})
+
+local utility = {}
+function utility.create(class, properties)
+    local obj = Instance.new(class)
+    for prop, v in next, properties do
+        obj[prop] = v
+    end
     return obj
 end
-
-function U.tween(obj, dur, props, style, dir)
-    local t = TweenService:Create(obj, TweenInfo.new(dur, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
-    t:Play()
-    return t
+function utility.gradient(colors)
+    local colortbl = {}
+    for i, color in next, colors do
+        table.insert(colortbl, ColorSequenceKeypoint.new((i -1) / (#colors - 1), color))
+    end
+    return ColorSequence.new(colortbl)
 end
-
-function U.corner(obj, r)
-    return U.new("UICorner", {CornerRadius = UDim.new(0, r or 4), Parent = obj})
+function utility.tween(obj, info, props)
+    local tween = services.TweenService:Create(obj, TweenInfo.new(unpack(info)), props)
+    tween:Play()
+    return tween
 end
-
-function U.stroke(obj, color, thick, trans)
-    return U.new("UIStroke", {
-        Color = color or ZalHub.theme.border,
-        Thickness = thick or 1,
-        Transparency = trans or 0,
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-        Parent = obj
-    })
+function utility.stroke(obj, color, thickness)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or Color3.fromRGB(50,50,50)
+    stroke.Thickness = thickness or 1
+    stroke.Transparency = 0.5
+    stroke.Parent = obj
+    return stroke
 end
-
-function U.pad(obj, t, b, l, r)
-    return U.new("UIPadding", {
-        PaddingTop = UDim.new(0, t or 0), PaddingBottom = UDim.new(0, b or 0),
-        PaddingLeft = UDim.new(0, l or 0), PaddingRight = UDim.new(0, r or 0),
-        Parent = obj
-    })
-end
-
-function U.list(obj, dir, gap, ha, va)
-    return U.new("UIListLayout", {
-        FillDirection = dir or Enum.FillDirection.Vertical,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, gap or 1),
-        HorizontalAlignment = ha or Enum.HorizontalAlignment.Left,
-        VerticalAlignment = va or Enum.VerticalAlignment.Top,
-        Parent = obj
-    })
-end
-
-function U.dragify(frame, handle)
-    local dragging, dragStart, startPos
-    handle = handle or frame
-    handle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true; dragStart = input.Position; startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+function utility.dragify(object, inputFrame)
+    local dragging, dragInput, dragStart, startPos
+    local targetInput = inputFrame or object
+    targetInput.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = object.Position
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    connection:Disconnect()
+                end
             end)
         end
     end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local d = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+    targetInput.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    services.UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 end
 
-function U.hover(obj, normal, hovered, dur)
-    obj.MouseEnter:Connect(function() U.tween(obj, dur or 0.1, {BackgroundColor3 = hovered}) end)
-    obj.MouseLeave:Connect(function() U.tween(obj, dur or 0.1, {BackgroundColor3 = normal}) end)
+local notifyHolder = game:GetService("CoreGui"):FindFirstChild("ZalHub_NotifyHolder")
+if not notifyHolder then
+    notifyHolder = utility.create("ScreenGui", {
+        Name = "ZalHub_NotifyHolder",
+        Parent = game:GetService("CoreGui"),
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true
+    })
+    local layout = utility.create("UIListLayout", {
+        Parent = notifyHolder,
+        Padding = UDim.new(0, 8),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        VerticalAlignment = Enum.VerticalAlignment.Bottom,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right
+    })
+    local padding = utility.create("UIPadding", {
+        Parent = notifyHolder,
+        PaddingBottom = UDim.new(0, 80),
+        PaddingRight = UDim.new(0, 10)
+    })
 end
 
--- ════════════════════════════════════════════════════════════
--- NOTIFICATIONS (CS:GO console-style)
--- ════════════════════════════════════════════════════════════
-local NotifyGui = U.new("ScreenGui", {
-    Name = "ZalHub_Notify", Parent = CoreGui,
-    ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999
-})
-local NotifyList = U.new("Frame", {
-    Size = UDim2.new(0, 340, 1, 0),
-    Position = UDim2.new(1, -350, 0, 0),
-    BackgroundTransparency = 1, Parent = NotifyGui
-})
-U.list(NotifyList, nil, 4, nil, Enum.VerticalAlignment.Bottom)
-U.pad(NotifyList, 0, 50, 0, 0)
-
-function ZalHub:Notify(opts)
-    opts = opts or {}
-    local dur = opts.Duration or 4
-    local ntype = opts.Type or "info"
-    local colors = {
-        info = ZalHub.accent, success = Color3.fromRGB(76, 175, 80),
-        warning = ZalHub.theme.warning, error = ZalHub.theme.danger
-    }
-    local col = colors[ntype] or ZalHub.accent
-
-    local card = U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundColor3 = ZalHub.theme.panelBg, BorderSizePixel = 0,
-        ClipsDescendants = true, Parent = NotifyList
+function library:Notify(options)
+    if not notifyHolder then return end
+    local notifyFrame = utility.create("Frame", {
+        Size = UDim2.new(0, 300, 0, 0),
+        Position = UDim2.new(1, 330, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+        BorderSizePixel = 0,
+        Parent = notifyHolder,
+        AnchorPoint = Vector2.new(1,1)
     })
-    U.corner(card, 3)
-    U.stroke(card, ZalHub.theme.borderDark, 1)
-
-    U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = col,
-        BorderSizePixel = 0, ZIndex = 2, Parent = card
+    notifyFrame.AutomaticSize = Enum.AutomaticSize.Y
+    utility.stroke(notifyFrame, library.accent, 1)
+    local border = utility.create("Frame", {
+        Size = UDim2.new(1, 4, 1, 4),
+        Position = UDim2.new(0, -2, 0, -2),
+        BackgroundColor3 = Color3.fromRGB(255,255,255),
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Parent = notifyFrame
     })
-
-    local inner = U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundTransparency = 1, Parent = card
+    local borderGradient = utility.create("UIGradient", {
+        Rotation = 45,
+        Color = utility.gradient(library.outline),
+        Parent = border
     })
-    U.pad(inner, 8, 8, 10, 10)
-    U.list(inner, nil, 2)
-
-    U.new("TextLabel", {
-        Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1,
-        Text = (opts.Title or "NOTIFICATION"):upper(),
-        TextColor3 = col, TextSize = 11,
-        Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = inner
+    local contentFrame = utility.create("Frame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+        BorderSizePixel = 0,
+        Parent = notifyFrame
     })
-    U.new("TextLabel", {
-        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundTransparency = 1, Text = opts.Content or "",
-        TextColor3 = ZalHub.theme.textSub, TextSize = 11,
-        Font = Enum.Font.Gotham, TextWrapped = true,
-        TextXAlignment = Enum.TextXAlignment.Left, Parent = inner
+    contentFrame.AutomaticSize = Enum.AutomaticSize.Y
+    local list = utility.create("UIListLayout", {
+        Parent = contentFrame,
+        Padding = UDim.new(0, 6)
     })
-
-    local timerBg = U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = ZalHub.theme.inputBg,
-        BorderSizePixel = 0, Parent = inner
+    utility.create("TextLabel", {
+        Size = UDim2.new(1, -12, 0, 24),
+        Position = UDim2.new(0, 6, 0, 6),
+        BackgroundTransparency = 1,
+        Text = options.Title or "Notification",
+        TextColor3 = library.accent,
+        TextSize = 15,
+        Font = Enum.Font.Code,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 2,
+        Parent = contentFrame
     })
-    local timerFill = U.new("Frame", {
-        Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = col,
-        BorderSizePixel = 0, Parent = timerBg
+    utility.create("TextLabel", {
+        Size = UDim2.new(1, -12, 0, 0),
+        Position = UDim2.new(0, 6, 0, 0),
+        BackgroundTransparency = 1,
+        Text = options.Content or "Message",
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        TextSize = 13,
+        Font = Enum.Font.Code,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        AutomaticSize = Enum.AutomaticSize.Y,
+        ZIndex = 2,
+        Parent = contentFrame
     })
-
-    card.Position = UDim2.new(1, 0, 0, 0)
-    U.tween(card, 0.25, {Position = UDim2.new(0, 0, 0, 0)})
-    U.tween(timerFill, dur, {Size = UDim2.new(0, 0, 1, 0)}, Enum.EasingStyle.Linear)
-
-    task.delay(dur, function()
-        U.tween(card, 0.2, {Position = UDim2.new(1, 0, 0, 0)})
-        task.wait(0.25); card:Destroy()
-    end)
-end
-
--- ════════════════════════════════════════════════════════════
--- WATERMARK (CS:GO net_graph style)
--- ════════════════════════════════════════════════════════════
-function ZalHub:Watermark(text)
-    local wmGui = U.new("ScreenGui", {
-        Name = "ZalHub_WM", Parent = CoreGui,
-        ResetOnSpawn = false, DisplayOrder = 998
-    })
-    local wm = U.new("Frame", {
-        Size = UDim2.new(0, 0, 0, 22), AutomaticSize = Enum.AutomaticSize.X,
-        Position = UDim2.new(1, -8, 0, 8), AnchorPoint = Vector2.new(1, 0),
-        BackgroundColor3 = ZalHub.theme.windowBg, BorderSizePixel = 0,
-        Parent = wmGui
-    })
-    U.corner(wm, 2)
-    U.stroke(wm, ZalHub.theme.border, 1, 0.3)
-    U.pad(wm, 0, 0, 8, 8)
-
-    U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = ZalHub.accent,
-        BorderSizePixel = 0, ZIndex = 2, Parent = wm
-    })
-
-    local lbl = U.new("TextLabel", {
-        Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1, Text = text or "ZalHub",
-        TextColor3 = ZalHub.theme.textSub, TextSize = 11,
-        Font = Enum.Font.RobotoMono, Parent = wm
-    })
-
-    local fps = 60; local lastT = tick()
-    RunService.RenderStepped:Connect(function()
-        fps = math.floor(1 / (tick() - lastT)); lastT = tick()
-    end)
+    local duration = options.Duration or 5
+    utility.tween(notifyFrame, {0.4, Enum.EasingStyle.Back}, {Position = UDim2.new(1, -10, 1, -10)})
     task.spawn(function()
-        while not ZalHub.unloaded do
-            local ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 1000)
-            lbl.Text = string.format("%s | %dfps | %dms", text or "ZalHub", fps, ping)
-            task.wait(0.5)
-        end
+        task.wait(duration)
+        utility.tween(notifyFrame, {0.4, Enum.EasingStyle.Quad}, {Position = UDim2.new(1, 330, 1, 0)})
+        task.wait(0.5)
+        notifyFrame:Destroy()
     end)
-    U.dragify(wm)
 end
 
--- ════════════════════════════════════════════════════════════
--- MAIN WINDOW (CS:GO Settings Menu Style)
--- ════════════════════════════════════════════════════════════
-function ZalHub:Window(opts)
-    opts = opts or {}
-    local title = opts.Title or "ZALHUB"
-    local size = opts.Size or UDim2.new(0, 660, 0, 520)
-
-    local gui = U.new("ScreenGui", {
-        Name = "ZalHub_Main", Parent = CoreGui,
-        ResetOnSpawn = false, DisplayOrder = 100
+function library:Window(name)
+    local gui = utility.create("ScreenGui", {
+        Name = "ZalHub",
+        Parent = game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"),
+        ResetOnSpawn = false
     })
-
-    -- Overlay for all popups (dropdowns, color pickers)
-    local overlay = U.new("Frame", {
-        Name = "Overlay", Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1, ZIndex = 200, Parent = gui
-    })
-
-    local main = U.new("Frame", {
-        Size = size, Position = UDim2.new(0.5, -size.X.Offset/2, 0.5, -size.Y.Offset/2),
-        BackgroundColor3 = ZalHub.theme.windowBg, BorderSizePixel = 0,
+    local holder = utility.create("Frame", {
+        Name = "Holder",
+        Size = UDim2.new(0, 550, 0, 600),
+        Position = UDim2.new(0.5, -275, 0.5, -300),
+        BackgroundColor3 = Color3.fromRGB(10, 10, 10),
+        BorderSizePixel = 0,
         Parent = gui
     })
-    main.ClipsDescendants = true
-    U.corner(main, 3)
-    U.stroke(main, ZalHub.theme.borderDark, 2)
-
-    -- ═══ HEADER BAR ═══
-    local header = U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = ZalHub.theme.headerBg,
-        BorderSizePixel = 0, ZIndex = 10, Parent = main
+    holder.ClipsDescendants = true
+    utility.create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = holder
     })
-    U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = ZalHub.accent,
-        BorderSizePixel = 0, ZIndex = 11, Parent = header
-    })
-    U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1),
-        BackgroundColor3 = ZalHub.theme.borderDark, BorderSizePixel = 0,
-        ZIndex = 11, Parent = header
-    })
-
-    U.new("TextLabel", {
-        Size = UDim2.new(0, 200, 1, 0), Position = UDim2.new(0, 10, 0, 2),
-        BackgroundTransparency = 1, Text = title,
-        TextColor3 = ZalHub.theme.text, TextSize = 13,
-        Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 11, Parent = header
-    })
-
-    -- Search bar
-    local searchContainer = U.new("Frame", {
-        Size = UDim2.new(0, 180, 0, 20), Position = UDim2.new(0.5, -90, 0.5, -10),
-        BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-        ZIndex = 12, Parent = header
-    })
-    U.corner(searchContainer, 2)
-    U.stroke(searchContainer, ZalHub.theme.border, 1, 0.3)
-    U.pad(searchContainer, 0, 0, 6, 0)
-    local searchBox = U.new("TextBox", {
-        Size = UDim2.new(1, -4, 1, 0), Position = UDim2.new(0, 4, 0, 0),
-        BackgroundTransparency = 1, PlaceholderText = "Search groups...",
-        PlaceholderColor3 = ZalHub.theme.textDim, Text = "",
-        TextColor3 = ZalHub.theme.text, TextSize = 11,
-        Font = Enum.Font.Gotham, ClearTextOnFocus = false,
-        ZIndex = 12, Parent = searchContainer
-    })
-
-    local closeBtn = U.new("TextButton", {
-        Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -32, 0, 1),
-        BackgroundTransparency = 1, Text = "✕",
-        TextColor3 = ZalHub.theme.textDim, TextSize = 14,
-        Font = Enum.Font.GothamBold, ZIndex = 12, Parent = header
-    })
-    closeBtn.MouseEnter:Connect(function() closeBtn.TextColor3 = ZalHub.theme.danger end)
-    closeBtn.MouseLeave:Connect(function() closeBtn.TextColor3 = ZalHub.theme.textDim end)
-    closeBtn.MouseButton1Click:Connect(function() gui.Enabled = false end)
-
-    local minBtn = U.new("TextButton", {
-        Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -60, 0, 1),
-        BackgroundTransparency = 1, Text = "—",
-        TextColor3 = ZalHub.theme.textDim, TextSize = 14,
-        Font = Enum.Font.GothamBold, ZIndex = 12, Parent = header
-    })
-    minBtn.MouseEnter:Connect(function() minBtn.TextColor3 = ZalHub.theme.text end)
-    minBtn.MouseLeave:Connect(function() minBtn.TextColor3 = ZalHub.theme.textDim end)
-
-    U.dragify(main, header)
-
-    -- ═══ TAB BAR ═══
-    local tabBar = U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 28), Position = UDim2.new(0, 0, 0, 32),
-        BackgroundColor3 = ZalHub.theme.panelBg, BorderSizePixel = 0,
-        ZIndex = 8, Parent = main
-    })
-    U.new("Frame", {
-        Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1),
-        BackgroundColor3 = ZalHub.theme.borderDark, BorderSizePixel = 0,
-        ZIndex = 9, Parent = tabBar
-    })
-
-    local tabContainer = U.new("Frame", {
-        Size = UDim2.new(1, -10, 1, 0), Position = UDim2.new(0, 5, 0, 0),
-        BackgroundTransparency = 1, ZIndex = 9, Parent = tabBar
-    })
-    U.list(tabContainer, Enum.FillDirection.Horizontal, 0, nil, Enum.VerticalAlignment.Bottom)
-
-    -- ═══ CONTENT AREA ═══
-    local contentArea = U.new("Frame", {
-        Size = UDim2.new(1, -16, 1, -68), Position = UDim2.new(0, 8, 0, 64),
-        BackgroundTransparency = 1, ZIndex = 3, Parent = main
-    })
-
-    -- Toggle keybind
-    UIS.InputBegan:Connect(function(input, gp)
-        if gp then return end
+    -- TOGGLE GUI / WATERMARK
+    local toggleGui = Instance.new("ScreenGui")
+    toggleGui.Name = "ZalHub_Toggle"
+    toggleGui.Parent = game:GetService("CoreGui")
+    toggleGui.ResetOnSpawn = false
+    toggleGui.DisplayOrder = 999
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Name = "ToggleBtn"
+    toggleBtn.Size = UDim2.new(0, 140, 0, 40)
+    toggleBtn.Position = UDim2.new(0, 20, 0, 10)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.Text = "ZalHub [ON]"
+    toggleBtn.TextColor3 = library.accent
+    toggleBtn.Font = Enum.Font.Code
+    toggleBtn.TextSize = 16
+    toggleBtn.ZIndex = 100
+    toggleBtn.Parent = toggleGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = toggleBtn
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = library.accent
+    stroke.Thickness = 1
+    stroke.Parent = toggleBtn
+    local isOpen = true
+    local function toggleWindow()
+        isOpen = not isOpen
+        holder.Visible = isOpen
+        if isOpen then
+            toggleBtn.Text = "ZalHub [ON]"
+            toggleBtn.TextColor3 = library.accent
+            stroke.Color = library.accent
+        else
+            toggleBtn.Text = "ZalHub [OFF]"
+            toggleBtn.TextColor3 = Color3.fromRGB(80, 80, 80)
+            stroke.Color = Color3.fromRGB(80, 80, 80)
+        end
+    end
+    toggleBtn.MouseButton1Click:Connect(toggleWindow)
+    services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
-            gui.Enabled = not gui.Enabled
+            toggleWindow()
         end
     end)
-
-    -- ════════════════════════════════════════════════════════════
-    -- TAB SYSTEM
-    -- ════════════════════════════════════════════════════════════
+    utility.dragify(toggleBtn, toggleBtn)
+    local mainBG = utility.create("Frame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+        BorderSizePixel = 0,
+        ZIndex = 1,
+        Parent = holder
+    })
+    utility.create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = mainBG
+    })
+    local topBar = utility.create("Frame", {
+        Size = UDim2.new(1, 0, 0, 50),
+        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = mainBG
+    })
+    utility.stroke(topBar, Color3.fromRGB(40, 40, 40), 1)
+    utility.create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = topBar
+    })
+    utility.create("TextLabel", {
+        Size = UDim2.new(0, 160, 1, 0),
+        Position = UDim2.new(0, 16, 0, 0),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = library.accent,
+        TextSize = 18,
+        Font = Enum.Font.Code,
+        TextStrokeTransparency = 0.5,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 3,
+        Parent = topBar
+    })
+    local tabBar = utility.create("Frame", {
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 0, 50),
+        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = mainBG
+    })
+    utility.stroke(tabBar, Color3.fromRGB(40, 40, 40), 1)
+    local tabContainer = utility.create("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        ZIndex = 3,
+        ClipsDescendants = true,
+        Parent = tabBar,
+        ScrollBarThickness = 0,
+        ScrollingDirection = Enum.ScrollingDirection.X,
+        AutomaticCanvasSize = Enum.AutomaticSize.X,
+        CanvasSize = UDim2.new(0, 0, 0, 0)
+    })
+    utility.create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 15),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+        Parent = tabContainer
+    })
+    -- === GLOBAL SEARCH BAR ===
+    local searchContainer = utility.create("Frame", {
+        Name = "GlobalSearch",
+        Size = UDim2.new(0, 220, 0, 32),
+        Position = UDim2.new(1, -240, 0.5, -16),
+        BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+        BorderSizePixel = 0,
+        ZIndex = 5,
+        Parent = topBar
+    })
+    utility.stroke(searchContainer, Color3.fromRGB(50, 50, 50), 1)
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = searchContainer})
+    local searchIcon = utility.create("TextLabel", {
+        Size = UDim2.new(0, 30, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "🔍",
+        TextColor3 = Color3.fromRGB(100, 100, 100),
+        TextSize = 16,
+        Font = Enum.Font.Code,
+        ZIndex = 6,
+        Parent = searchContainer
+    })
+    local searchBox = utility.create("TextBox", {
+        Size = UDim2.new(1, -35, 1, -6),
+        Position = UDim2.new(0, 32, 0, 3),
+        BackgroundTransparency = 1,
+        Text = "",
+        PlaceholderText = "Search Options...",
+        PlaceholderColor3 = Color3.fromRGB(80, 80, 80),
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        TextSize = 14,
+        Font = Enum.Font.Code,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false,
+        ZIndex = 6,
+        Parent = searchContainer
+    })
+    local content = utility.create("Frame", {
+        Size = UDim2.new(1, -20, 1, -100),
+        Position = UDim2.new(0, 10, 0, 95),
+        BackgroundTransparency = 1,
+        ZIndex = 2,
+        Parent = mainBG
+    })
+    utility.dragify(holder, topBar)
     local currentTab = nil
-    local Window = {}
-
-    function Window:Tab(tabName)
-        local tabBtn = U.new("TextButton", {
-            Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundColor3 = ZalHub.theme.panelBg, BackgroundTransparency = 1,
-            BorderSizePixel = 0, Text = "", ZIndex = 10, Parent = tabContainer
+    local windowActions = {}
+    function windowActions:Tab(tabName)
+        local tabBtn = utility.create("TextButton", {
+            Size = UDim2.new(0, 0, 0, 35),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundTransparency = 1,
+            Text = tabName,
+            TextColor3 = Color3.fromRGB(120, 120, 120),
+            TextSize = 15,
+            Font = Enum.Font.Code,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            ZIndex = 4,
+            Parent = tabContainer
         })
-        U.pad(tabBtn, 0, 0, 12, 12)
-
-        local tabLabel = U.new("TextLabel", {
-            Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundTransparency = 1, Text = tabName:upper(),
-            TextColor3 = ZalHub.theme.textDim, TextSize = 11,
-            Font = Enum.Font.GothamBold, ZIndex = 11, Parent = tabBtn
+        local underline = utility.create("Frame", {
+            Size = UDim2.new(1, 0, 0, 3),
+            Position = UDim2.new(0, 0, 1, 2),
+            BackgroundColor3 = library.accent,
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            ZIndex = 4,
+            Parent = tabBtn
         })
-
-        local indicator = U.new("Frame", {
-            Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, -2),
-            BackgroundColor3 = ZalHub.accent, BorderSizePixel = 0,
-            BackgroundTransparency = 1, ZIndex = 11, Parent = tabBtn
+        local tabFrame = utility.create("Frame", {
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Visible = false,
+            ZIndex = 2,
+            Parent = content
         })
-
-        local tabContent = U.new("Frame", {
-            Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
-            Visible = false, ZIndex = 4, Parent = contentArea
+        local leftCol = utility.create("ScrollingFrame", {
+            Size = UDim2.new(0.5, -2, 1, 0),
+            Position = UDim2.new(0, 0, 0, 0),
+            BackgroundTransparency = 1,
+            ScrollBarThickness = 0,
+            ScrollBarImageColor3 = Color3.fromRGB(50, 50, 50),
+            Visible = true,
+            ZIndex = 3,
+            Parent = tabFrame
         })
-
-        local leftCol = U.new("ScrollingFrame", {
-            Size = UDim2.new(0.5, -4, 1, 0),
-            BackgroundTransparency = 1, ScrollBarThickness = 3,
-            ScrollBarImageColor3 = ZalHub.theme.scrollbar,
-            ScrollBarImageTransparency = 0.2,
-            CanvasSize = UDim2.new(0, 0, 0, 0),
-            AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            ZIndex = 5, Parent = tabContent
+        leftCol.CanvasSize = UDim2.new(0, 0, 0, 1000)
+        local rightCol = utility.create("ScrollingFrame", {
+            Size = UDim2.new(0.5, -2, 1, 0),
+            Position = UDim2.new(0.5, 2, 0, 0),
+            BackgroundTransparency = 1,
+            ScrollBarThickness = 0,
+            ScrollBarImageColor3 = Color3.fromRGB(50, 50, 50),
+            Visible = true,
+            ZIndex = 3,
+            Parent = tabFrame
         })
-        U.list(leftCol, nil, 6)
-        U.pad(leftCol, 0, 6, 0, 3)
-
-        local rightCol = U.new("ScrollingFrame", {
-            Size = UDim2.new(0.5, -4, 1, 0), Position = UDim2.new(0.5, 4, 0, 0),
-            BackgroundTransparency = 1, ScrollBarThickness = 3,
-            ScrollBarImageColor3 = ZalHub.theme.scrollbar,
-            ScrollBarImageTransparency = 0.2,
-            CanvasSize = UDim2.new(0, 0, 0, 0),
-            AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            ZIndex = 5, Parent = tabContent
+        rightCol.CanvasSize = UDim2.new(0, 0, 0, 1000)
+        utility.create("UIPadding", {
+            Parent = leftCol,
+            PaddingLeft = UDim.new(0, 1),
+            PaddingRight = UDim.new(0, 1),
+            PaddingTop = UDim.new(0, 10),
+            PaddingBottom = UDim.new(0, 10)
         })
-        U.list(rightCol, nil, 6)
-        U.pad(rightCol, 0, 6, 3, 0)
-
-        local function selectTab()
-            if currentTab then
-                currentTab.Content.Visible = false
-                U.tween(currentTab.Label, 0.15, {TextColor3 = ZalHub.theme.textDim})
-                U.tween(currentTab.Indicator, 0.15, {BackgroundTransparency = 1})
-                U.tween(currentTab.Btn, 0.15, {BackgroundTransparency = 1})
-            end
-            tabContent.Visible = true
-            U.tween(tabLabel, 0.15, {TextColor3 = ZalHub.theme.text})
-            U.tween(indicator, 0.15, {BackgroundTransparency = 0})
-            U.tween(tabBtn, 0.15, {BackgroundTransparency = 0.9, BackgroundColor3 = ZalHub.accent})
-            currentTab = {Content = tabContent, Label = tabLabel, Indicator = indicator, Btn = tabBtn}
+        utility.create("UIPadding", {
+            Parent = rightCol,
+            PaddingLeft = UDim.new(0, 1),
+            PaddingRight = UDim.new(0, 1),
+            PaddingTop = UDim.new(0, 10),
+            PaddingBottom = UDim.new(0, 10)
+        })
+        local leftList = utility.create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            HorizontalAlignment = Enum.HorizontalAlignment.Left,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 10),
+            Parent = leftCol
+        })
+        local rightList = utility.create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            HorizontalAlignment = Enum.HorizontalAlignment.Left,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 10),
+            Parent = rightCol
+        })
+        local function updateCanvas()
+            leftCol.CanvasSize = UDim2.new(0, 0, 0, leftList.AbsoluteContentSize.Y + 20)
+            rightCol.CanvasSize = UDim2.new(0, 0, 0, rightList.AbsoluteContentSize.Y + 20)
         end
-
-        tabBtn.MouseButton1Click:Connect(selectTab)
-        tabBtn.MouseEnter:Connect(function()
-            if not currentTab or currentTab.Btn ~= tabBtn then
-                U.tween(tabLabel, 0.1, {TextColor3 = ZalHub.theme.textSub})
+        leftList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+        rightList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+        local function select()
+            if currentTab then
+                currentTab.Frame.Visible = false
+                utility.tween(currentTab.Btn, {0.2}, {TextColor3 = Color3.fromRGB(120, 120, 120)})
+                utility.tween(currentTab.Line, {0.2}, {BackgroundTransparency = 1})
             end
-        end)
-        tabBtn.MouseLeave:Connect(function()
-            if not currentTab or currentTab.Btn ~= tabBtn then
-                U.tween(tabLabel, 0.1, {TextColor3 = ZalHub.theme.textDim})
-            end
-        end)
-
-        if not currentTab then selectTab() end
-
-        -- ════════════════════════════════════════════════════════════
-        -- GROUPBOX (CS:GO Panel Style)
-        -- ════════════════════════════════════════════════════════════
-        local Tab = {}
-        local gIdx = 0
-
-        function Tab:Group(name, side)
-            side = side or "Left"
-            local parent = side == "Left" and leftCol or rightCol
-            gIdx = gIdx + 1
-
-            local group = U.new("Frame", {
-                Name = "Group_" .. name,
-                Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundColor3 = ZalHub.theme.panelBg, BorderSizePixel = 0,
-                ZIndex = 6, LayoutOrder = gIdx, Parent = parent
+            tabFrame.Visible = true
+            leftCol.Visible = true
+            rightCol.Visible = true
+            leftCol.CanvasPosition = Vector2.new(0, 0)
+            rightCol.CanvasPosition = Vector2.new(0, 0)
+            updateCanvas()
+            utility.tween(tabBtn, {0.2}, {TextColor3 = library.accent})
+            utility.tween(underline, {0.2}, {BackgroundTransparency = 0})
+           
+            currentTab = {
+                Frame = tabFrame,
+                Btn = tabBtn,
+                Line = underline,
+                LeftCol = leftCol,
+                RightCol = rightCol
+            }
+        end
+        tabBtn.MouseButton1Click:Connect(select)
+        if not currentTab then select() end
+        local tabActions = {}
+        local currentSectionIndex = 0
+        function tabActions:Section(sectionName)
+            local targetCol = currentSectionIndex % 2 == 0 and leftCol or rightCol
+            currentSectionIndex = currentSectionIndex + 1
+            local sectionFrame = utility.create("Frame", {
+                Name = "ZalSection",
+                BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+                BorderSizePixel = 0,
+                AutomaticSize = Enum.AutomaticSize.Y,
+                Size = UDim2.new(1, 0, 0, 0),
+                ZIndex = 4,
+                Parent = targetCol
             })
-            U.corner(group, 3)
-            U.stroke(group, ZalHub.theme.border, 1, 0.3)
-
-            local hdr = U.new("Frame", {
-                Size = UDim2.new(1, 0, 0, 24),
-                BackgroundColor3 = ZalHub.theme.headerBg, BorderSizePixel = 0,
-                ZIndex = 7, Parent = group
+            utility.stroke(sectionFrame, Color3.fromRGB(40, 40, 40), 1)
+            utility.create("UICorner", {
+                CornerRadius = UDim.new(0, 8),
+                Parent = sectionFrame
             })
-            U.new("UICorner", {CornerRadius = UDim.new(0, 3), Parent = hdr})
-            U.new("Frame", {
-                Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6),
-                BackgroundColor3 = ZalHub.theme.headerBg, BorderSizePixel = 0,
-                ZIndex = 7, Parent = hdr
+            utility.create("TextLabel", {
+                Size = UDim2.new(1, -2, 0, 25),
+                Position = UDim2.new(0, 1, 0, 0),
+                BackgroundTransparency = 1,
+                Text = sectionName:upper(),
+                TextColor3 = library.accent,
+                TextSize = 15,
+                Font = Enum.Font.Code,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                ZIndex = 5,
+                Parent = sectionFrame
             })
-            U.new("Frame", {
-                Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1),
-                BackgroundColor3 = ZalHub.theme.border, BorderSizePixel = 0,
-                ZIndex = 8, Parent = hdr
+            local items = utility.create("Frame", {
+                Size = UDim2.new(1, -2, 0, 0),
+                Position = UDim2.new(0, 1, 0, 25),
+                BackgroundTransparency = 1,
+                AutomaticSize = Enum.AutomaticSize.Y,
+                ZIndex = 5,
+                Parent = sectionFrame
             })
-
-            local groupTitle = U.new("TextLabel", {
-                Size = UDim2.new(1, -12, 1, 0), Position = UDim2.new(0, 8, 0, 0),
-                BackgroundTransparency = 1, Text = name,
-                TextColor3 = ZalHub.theme.text, TextSize = 11,
-                Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left,
-                ZIndex = 8, Parent = hdr
+            local itemLayout = utility.create("UIListLayout", {
+                Padding = UDim.new(0, 0),
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                Parent = items
             })
-
-            local items = U.new("Frame", {
-                Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 0, 24),
-                BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y,
-                ZIndex = 7, Parent = group
-            })
-            U.list(items, nil, 0)
-            U.pad(items, 4, 6, 8, 8)
-
-            -- ════════════════════════════════════════════════════════════
-            -- ELEMENTS
-            -- ════════════════════════════════════════════════════════════
-            local G = {}
-
-            -- ═══ TOGGLE (CS:GO Checkbox) + Inline Keybind & Color ═══
-            function G:Toggle(opts)
-                opts = opts or {}
-                local text = opts.Text or "Option"
-                local flag = opts.Flag or text
-                local default = opts.Default or false
-                local cb = opts.Callback
+            local sectionActions = {}
+            -- MODIFIED TOGGLE (smaller, matches pic)
+            function sectionActions:Toggle(text, flag, defaultOrCallback, callback)
+                local default = false
+                local cb = nil
+                if typeof(defaultOrCallback) == "boolean" then
+                    default = defaultOrCallback
+                    cb = callback
+                elseif typeof(defaultOrCallback) == "function" then
+                    cb = defaultOrCallback
+                else
+                    cb = callback
+                end
                 local enabled = default
-                ZalHub.flags[flag] = enabled
-
-                local row = U.new("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1,
-                    BorderSizePixel = 0, Text = "", ZIndex = 8, Parent = items
+                local toggle = utility.create("TextButton", {
+                    Size = UDim2.new(1, 0, 0, 30),
+                    BackgroundTransparency = 1,
+                    Text = "",
+                    ZIndex = 6,
+                    Parent = items
                 })
-
-                local box = U.new("Frame", {
-                    Size = UDim2.new(0, 14, 0, 14),
-                    Position = UDim2.new(0, 0, 0.5, -7),
-                    BackgroundColor3 = enabled and ZalHub.accent or ZalHub.theme.inputBg,
-                    BorderSizePixel = 0, ZIndex = 9, Parent = row
+                local textLabel = utility.create("TextLabel", {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Size = UDim2.new(1, -80, 0, 20),
+                    Position = UDim2.new(0, 15, 0.5, 0),
+                    BackgroundTransparency = 1,
+                    Text = text,
+                    TextColor3 = Color3.fromRGB(180, 180, 180),
+                    TextSize = 13,
+                    Font = Enum.Font.Code,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    ZIndex = 7,
+                    Parent = toggle
                 })
-                U.corner(box, 2)
-                U.stroke(box, enabled and ZalHub.accent or ZalHub.theme.border, 1)
-
-                local tick = U.new("TextLabel", {
-                    Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
-                    Text = "✓", TextColor3 = Color3.new(1, 1, 1),
-                    TextSize = 11, Font = Enum.Font.GothamBold,
-                    TextTransparency = enabled and 0 or 1,
-                    ZIndex = 10, Parent = box
+                local track = utility.create("Frame", {
+                    Size = UDim2.new(0, 36, 0, 18),
+                    Position = UDim2.new(1, -45, 0.5, -9),
+                    BackgroundColor3 = enabled and library.accent or Color3.fromRGB(30, 30, 30),
+                    ZIndex = 7,
+                    Parent = toggle
                 })
-
-                local lbl = U.new("TextLabel", {
-                    Size = UDim2.new(1, -50, 1, 0), Position = UDim2.new(0, 20, 0, 0),
-                    BackgroundTransparency = 1, Text = text,
-                    TextColor3 = enabled and ZalHub.theme.text or ZalHub.theme.textSub,
-                    TextSize = 11, Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9, Parent = row
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 9), Parent = track})
+                utility.stroke(track, Color3.fromRGB(50, 50, 50), 1)
+                local knob = utility.create("Frame", {
+                    Size = UDim2.new(0, 16, 0, 16),
+                    BackgroundColor3 = Color3.new(1, 1, 1),
+                    ZIndex = 8,
+                    Parent = track
                 })
-
-                row.MouseEnter:Connect(function()
-                    if not enabled then U.tween(lbl, 0.08, {TextColor3 = ZalHub.theme.text}) end
-                end)
-                row.MouseLeave:Connect(function()
-                    if not enabled then U.tween(lbl, 0.08, {TextColor3 = ZalHub.theme.textSub}) end
-                end)
-
-                row.MouseButton1Click:Connect(function()
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = knob})
+                local padding = 1
+                local offPos = UDim2.new(0, padding, 0.5, -8)
+                local onPos = UDim2.new(1, -(16 + padding), 0.5, -8)
+                knob.Position = enabled and onPos or offPos
+                toggle.MouseButton1Click:Connect(function()
                     enabled = not enabled
-                    ZalHub.flags[flag] = enabled
-                    U.tween(box, 0.12, {BackgroundColor3 = enabled and ZalHub.accent or ZalHub.theme.inputBg})
-                    U.tween(tick, 0.1, {TextTransparency = enabled and 0 or 1})
-                    U.tween(lbl, 0.1, {TextColor3 = enabled and ZalHub.theme.text or ZalHub.theme.textSub})
-                    local s = box:FindFirstChildOfClass("UIStroke")
-                    if s then U.tween(s, 0.12, {Color = enabled and ZalHub.accent or ZalHub.theme.border}) end
-                    if cb then cb(enabled) end
-                end)
-
-                -- Inline addons (keybind + color)
-                local addon = U.new("Frame", {
-                    Size = UDim2.new(0, 0, 0, 16), AutomaticSize = Enum.AutomaticSize.X,
-                    Position = UDim2.new(1, 0, 0.5, -8), AnchorPoint = Vector2.new(1, 0),
-                    BackgroundTransparency = 1, ZIndex = 10, Parent = row
-                })
-                U.list(addon, Enum.FillDirection.Horizontal, 3, Enum.HorizontalAlignment.Right)
-
-                local Obj = {}
-                function Obj:Keybind(kOpts)
-                    kOpts = kOpts or {}
-                    local kFlag = kOpts.Flag or (flag .. "_key")
-                    local kDefault = kOpts.Default or Enum.KeyCode.Unknown
-                    ZalHub.flags[kFlag] = kDefault
-                    local listening = false
-
-                    local kBtn = U.new("TextButton", {
-                        Size = UDim2.new(0, 44, 0, 16),
-                        BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                        Text = kDefault == Enum.KeyCode.Unknown and "[-]" or "[" .. kDefault.Name .. "]",
-                        TextColor3 = ZalHub.theme.textDim, TextSize = 9,
-                        Font = Enum.Font.RobotoMono, ZIndex = 11, Parent = addon
-                    })
-                    U.corner(kBtn, 2)
-                    U.stroke(kBtn, ZalHub.theme.border, 1, 0.5)
-
-                    kBtn.MouseButton1Click:Connect(function()
-                        listening = true; kBtn.Text = "[...]"; kBtn.TextColor3 = ZalHub.accent
-                    end)
-                    UIS.InputBegan:Connect(function(input, gp)
-                        if listening and input.UserInputType == Enum.UserInputType.Keyboard then
-                            listening = false
-                            if input.KeyCode == Enum.KeyCode.Escape then
-                                ZalHub.flags[kFlag] = Enum.KeyCode.Unknown; kBtn.Text = "[-]"
-                            else
-                                ZalHub.flags[kFlag] = input.KeyCode; kBtn.Text = "[" .. input.KeyCode.Name .. "]"
-                            end
-                            kBtn.TextColor3 = ZalHub.theme.textDim
-                        elseif not listening and not gp and input.KeyCode == ZalHub.flags[kFlag] then
-                            row.MouseButton1Click:Fire()
-                        end
-                    end)
-                end
-
-                function Obj:ColorPicker(cOpts)
-                    cOpts = cOpts or {}
-                    local cFlag = cOpts.Flag or (flag .. "_color")
-                    local cDefault = cOpts.Default or Color3.new(1, 1, 1)
-                    local cCb = cOpts.Callback
-                    ZalHub.flags[cFlag] = cDefault
-
-                    local cBtn = U.new("TextButton", {
-                        Size = UDim2.new(0, 22, 0, 14),
-                        BackgroundColor3 = cDefault, BorderSizePixel = 0,
-                        Text = "", ZIndex = 11, Parent = addon
-                    })
-                    U.corner(cBtn, 2)
-                    U.stroke(cBtn, ZalHub.theme.border, 1, 0.3)
-
-                    local function openFullColorPicker()
-                        local picker = U.new("Frame", {
-                            Size = UDim2.new(0, 220, 0, 180),
-                            BackgroundColor3 = ZalHub.theme.panelBg, BorderSizePixel = 0,
-                            ZIndex = 250, Parent = overlay
-                        })
-                        U.corner(picker, 3)
-                        U.stroke(picker, ZalHub.accent, 1)
-                        picker.Position = UDim2.new(0, math.clamp(cBtn.AbsolutePosition.X - 100, 0, 500), 0,
-                            cBtn.AbsolutePosition.Y + cBtn.AbsoluteSize.Y + 5)
-
-                        -- HSV box
-                        local svBox = U.new("ImageButton", {
-                            Size = UDim2.new(0, 150, 0, 150), Position = UDim2.new(0, 5, 0, 5),
-                            BackgroundColor3 = Color3.new(1,1,1), Image = "rbxassetid://284402810",
-                            BorderSizePixel = 0, ZIndex = 251, Parent = picker
-                        })
-                        U.corner(svBox, 2)
-                        local svGrad = U.new("UIGradient", {
-                            Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(1, Color3.fromHSV(0,1,1))},
-                            Rotation = 0, Parent = svBox
-                        })
-                        local wbGrad = U.new("UIGradient", {
-                            Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1)},
-                            Rotation = 90, Parent = svBox
-                        })
-                        local svCursor = U.new("Frame", {
-                            Size = UDim2.new(0, 8, 0, 8), BackgroundColor3 = Color3.new(1,1,1),
-                            BorderSizePixel = 0, ZIndex = 252, Parent = svBox
-                        })
-                        U.corner(svCursor, 4)
-                        U.stroke(svCursor, Color3.new(0,0,0), 1)
-                        svCursor.Position = UDim2.new(1, -4, 0, -4) -- top-right default (full sat, min val)
-
-                        -- Hue bar
-                        local hueBar = U.new("ImageButton", {
-                            Size = UDim2.new(0, 18, 0, 150), Position = UDim2.new(0, 160, 0, 5),
-                            BackgroundColor3 = Color3.new(1,1,1), Image = "rbxassetid://284402810",
-                            BorderSizePixel = 0, ZIndex = 251, Parent = picker
-                        })
-                        U.corner(hueBar, 2)
-                        U.new("UIGradient", {
-                            Color = ColorSequence.new{
-                                ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
-                                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255,255,0)),
-                                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)),
-                                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
-                                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0,0,255)),
-                                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255,0,255)),
-                                ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0)),
-                            }, Rotation = 90, Parent = hueBar
-                        })
-                        local hueCursor = U.new("Frame", {
-                            Size = UDim2.new(0, 22, 0, 4), BackgroundColor3 = Color3.new(1,1,1),
-                            BorderSizePixel = 0, ZIndex = 252, Parent = hueBar
-                        })
-                        U.stroke(hueCursor, Color3.new(0,0,0), 1)
-                        hueCursor.Position = UDim2.new(0, -2, 0, -2)
-
-                        -- Alpha bar
-                        local alphaBar = U.new("ImageButton", {
-                            Size = UDim2.new(0, 18, 0, 150), Position = UDim2.new(0, 183, 0, 5),
-                            BackgroundColor3 = Color3.new(1,1,1), Image = "rbxassetid://284402810",
-                            BorderSizePixel = 0, ZIndex = 251, Parent = picker
-                        })
-                        U.corner(alphaBar, 2)
-                        local alphaGrad = U.new("UIGradient", {
-                            Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1)},
-                            Rotation = 90, Parent = alphaBar
-                        })
-                        local alphaCursor = U.new("Frame", {
-                            Size = UDim2.new(0, 22, 0, 4), BackgroundColor3 = Color3.new(1,1,1),
-                            BorderSizePixel = 0, ZIndex = 252, Parent = alphaBar
-                        })
-                        U.stroke(alphaCursor, Color3.new(0,0,0), 1)
-                        alphaCursor.Position = UDim2.new(0, -2, 1, -2)
-
-                        local h,s,v = cDefault:ToHSV()
-                        local alpha = 1
-                        local function updateColor()
-                            local col = Color3.fromHSV(h, s, v)
-                            cBtn.BackgroundColor3 = col
-                            ZalHub.flags[cFlag] = {col, alpha}
-                            if cCb then cCb(col, alpha) end
-                        end
-
-                        local function updateSV()
-                            svGrad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(1, Color3.fromHSV(h,1,1))}
-                            svCursor.Position = UDim2.new(s, -4, 1-v, -4)
-                            updateColor()
-                        end
-
-                        local svDrag, hueDrag, alphaDrag = false, false, false
-                        svBox.InputBegan:Connect(function(inp)
-                            if inp.UserInputType == Enum.UserInputType.MouseButton1 then svDrag = true end
-                        end)
-                        hueBar.InputBegan:Connect(function(inp)
-                            if inp.UserInputType == Enum.UserInputType.MouseButton1 then hueDrag = true end
-                        end)
-                        alphaBar.InputBegan:Connect(function(inp)
-                            if inp.UserInputType == Enum.UserInputType.MouseButton1 then alphaDrag = true end
-                        end)
-                        UIS.InputChanged:Connect(function(inp)
-                            if svDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                                local mx = (inp.Position.X - svBox.AbsolutePosition.X) / svBox.AbsoluteSize.X
-                                local my = (inp.Position.Y - svBox.AbsolutePosition.Y) / svBox.AbsoluteSize.Y
-                                s = math.clamp(mx, 0, 1); v = 1 - math.clamp(my, 0, 1)
-                                updateSV()
-                            elseif hueDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                                local my = (inp.Position.Y - hueBar.AbsolutePosition.Y) / hueBar.AbsoluteSize.Y
-                                h = math.clamp(my, 0, 1)
-                                hueCursor.Position = UDim2.new(0, -2, h, -2)
-                                updateSV()
-                            elseif alphaDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                                local my = (inp.Position.Y - alphaBar.AbsolutePosition.Y) / alphaBar.AbsoluteSize.Y
-                                alpha = 1 - math.clamp(my, 0, 1)
-                                alphaCursor.Position = UDim2.new(0, -2, 1-alpha, -2)
-                                updateColor()
-                            end
-                        end)
-                        UIS.InputEnded:Connect(function(inp)
-                            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                                svDrag, hueDrag, alphaDrag = false, false, false
-                            end
-                        end)
-
-                        local conn
-                        conn = UIS.InputBegan:Connect(function(inp)
-                            if inp.UserInputType == Enum.UserInputType.MouseButton1 and picker then
-                                local pos = UIS:GetMouseLocation()
-                                if not (picker.AbsolutePosition.X <= pos.X and pos.X <= picker.AbsolutePosition.X + picker.AbsoluteSize.X
-                                    and picker.AbsolutePosition.Y <= pos.Y and pos.Y <= picker.AbsolutePosition.Y + picker.AbsoluteSize.Y) then
-                                    picker:Destroy()
-                                    conn:Disconnect()
-                                end
-                            end
-                        end)
-                        updateSV()
-                    end
-                    cBtn.MouseButton1Click:Connect(openFullColorPicker)
-                end
-
-                return Obj
-            end
-
-            -- ═══ SLIDER (CS:GO style with numeric value box) ═══
-            function G:Slider(opts)
-                opts = opts or {}
-                local text = opts.Text or "Value"
-                local flag = opts.Flag or text
-                local min = opts.Min or 0
-                local max = opts.Max or 100
-                local default = opts.Default or min
-                local increment = opts.Increment or 1
-                local suffix = opts.Suffix or ""
-                local cb = opts.Callback
-                ZalHub.flags[flag] = default
-
-                local frame = U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 38), BackgroundTransparency = 1,
-                    ZIndex = 8, Parent = items
-                })
-
-                U.new("TextLabel", {
-                    Size = UDim2.new(0.6, 0, 0, 14), Position = UDim2.new(0, 0, 0, 0),
-                    BackgroundTransparency = 1, Text = text,
-                    TextColor3 = ZalHub.theme.textSub, TextSize = 11,
-                    Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 9, Parent = frame
-                })
-
-                local valBox = U.new("TextBox", {
-                    Size = UDim2.new(0, 48, 0, 16),
-                    Position = UDim2.new(1, -48, 0, 0),
-                    BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                    Text = tostring(default) .. suffix,
-                    TextColor3 = ZalHub.accent, TextSize = 10,
-                    Font = Enum.Font.RobotoMono, ZIndex = 9,
-                    ClearTextOnFocus = true, Parent = frame
-                })
-                U.corner(valBox, 2)
-                U.stroke(valBox, ZalHub.theme.border, 1, 0.5)
-
-                local track = U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 8), Position = UDim2.new(0, 0, 0, 20),
-                    BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                    ZIndex = 9, Parent = frame
-                })
-                U.corner(track, 2)
-                U.stroke(track, ZalHub.theme.border, 1, 0.5)
-
-                local fill = U.new("Frame", {
-                    Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
-                    BackgroundColor3 = ZalHub.accent, BorderSizePixel = 0,
-                    ZIndex = 10, Parent = track
-                })
-                U.corner(fill, 2)
-                U.new("UIGradient", {
-                    Color = ColorSequence.new(ZalHub.accentDim, ZalHub.accent),
-                    Rotation = 0, Parent = fill
-                })
-
-                local thumb = U.new("Frame", {
-                    Size = UDim2.new(0, 4, 0, 14),
-                    AnchorPoint = Vector2.new(0.5, 0.5),
-                    Position = UDim2.new((default - min) / (max - min), 0, 0.5, 0),
-                    BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
-                    ZIndex = 11, Parent = track
-                })
-                U.corner(thumb, 1)
-
-                local dragBtn = U.new("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 20), Position = UDim2.new(0, 0, 0.5, -10),
-                    BackgroundTransparency = 1, Text = "", ZIndex = 12, Parent = track
-                })
-
-                local function setValue(val)
-                    val = math.clamp(val, min, max)
-                    val = math.floor(val / increment + 0.5) * increment
-                    val = tonumber(string.format("%.4g", val))
-                    local perc = (val - min) / (max - min)
-                    U.tween(fill, 0.06, {Size = UDim2.new(perc, 0, 1, 0)})
-                    U.tween(thumb, 0.06, {Position = UDim2.new(perc, 0, 0.5, 0)})
-                    valBox.Text = tostring(val) .. suffix
-                    ZalHub.flags[flag] = val
-                    if cb then cb(val) end
-                end
-
-                local dragging = false
-                dragBtn.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        dragging = true
-                        local perc = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-                        setValue(min + (max - min) * perc)
-                    end
-                end)
-                UIS.InputChanged:Connect(function(input)
-                    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                        local perc = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-                        setValue(min + (max - min) * perc)
-                    end
-                end)
-                UIS.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-                end)
-
-                valBox.FocusLost:Connect(function(enter)
-                    if enter then
-                        local num = tonumber(valBox.Text:gsub(suffix, ""))
-                        if num then setValue(num) else valBox.Text = tostring(ZalHub.flags[flag]) .. suffix end
-                    else
-                        valBox.Text = tostring(ZalHub.flags[flag]) .. suffix
+                    local targetPos = enabled and onPos or offPos
+                    local targetColor = enabled and library.accent or Color3.fromRGB(30, 30, 30)
+                    utility.tween(knob, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {Position = targetPos})
+                    utility.tween(track, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {BackgroundColor3 = targetColor})
+                    library.flags[flag] = enabled
+                    if cb then
+                        cb(enabled)
                     end
                 end)
             end
-
-            -- ═══ DROPDOWN (CS:GO Combo Box with search) ═══
-            function G:Dropdown(opts)
-                opts = opts or {}
-                local text = opts.Text or "Select"
-                local flag = opts.Flag or text
-                local values = opts.Values or {}
-                local default = opts.Default
-                local multi = opts.Multi or false
-                local cb = opts.Callback
-
-                ZalHub.flags[flag] = multi and {} or (default or nil)
-
-                local frame = U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1,
-                    ZIndex = 8, Parent = items
+            function sectionActions:Textbox(text, flag, placeholder, callback)
+                local textboxFrame = utility.create("Frame", {
+                    Size = UDim2.new(1, 0, 0, 50),
+                    BackgroundTransparency = 1,
+                    ZIndex = 6,
+                    Parent = items
                 })
-                U.new("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1,
-                    Text = text, TextColor3 = ZalHub.theme.textSub,
-                    TextSize = 11, Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9, Parent = frame
+                utility.create("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 20),
+                    BackgroundTransparency = 1,
+                    Text = text,
+                    TextColor3 = Color3.fromRGB(180, 180, 180),
+                    TextSize = 14,
+                    Font = Enum.Font.Code,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    ZIndex = 7,
+                    Parent = textboxFrame
                 })
-
-                local btn = U.new("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 22), Position = UDim2.new(0, 0, 0, 16),
-                    BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                    Text = "", ZIndex = 9, Parent = frame
+                local box = utility.create("TextBox", {
+                    Size = UDim2.new(1, 0, 0, 24),
+                    Position = UDim2.new(0, 0, 0, 22),
+                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    BorderSizePixel = 0,
+                    PlaceholderText = placeholder or "...",
+                    Text = "",
+                    TextColor3 = Color3.fromRGB(220, 220, 220),
+                    PlaceholderColor3 = Color3.fromRGB(80, 80, 80),
+                    TextSize = 14,
+                    Font = Enum.Font.Code,
+                    ZIndex = 7,
+                    Parent = textboxFrame
                 })
-                U.corner(btn, 2)
-                U.stroke(btn, ZalHub.theme.border, 1, 0.3)
-
-                local btnLbl = U.new("TextLabel", {
-                    Size = UDim2.new(1, -24, 1, 0), Position = UDim2.new(0, 6, 0, 0),
-                    BackgroundTransparency = 1, Text = default or "...",
-                    TextColor3 = default and ZalHub.theme.text or ZalHub.theme.textDim,
-                    TextSize = 11, Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 10, Parent = btn
-                })
-                local arrow = U.new("TextLabel", {
-                    Size = UDim2.new(0, 18, 1, 0), Position = UDim2.new(1, -20, 0, 0),
-                    BackgroundTransparency = 1, Text = "▾",
-                    TextColor3 = ZalHub.theme.textDim, TextSize = 12,
-                    Font = Enum.Font.GothamBold, ZIndex = 10, Parent = btn
-                })
-
-                local listFrame = U.new("ScrollingFrame", {
-                    Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 2),
-                    BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                    Visible = false, ZIndex = 200, ScrollBarThickness = 3,
-                    ScrollBarImageColor3 = ZalHub.theme.scrollbar,
-                    CanvasSize = UDim2.new(0, 0, 0, 0), Parent = overlay -- on overlay!
-                })
-                U.corner(listFrame, 2)
-                U.stroke(listFrame, ZalHub.theme.border, 1, 0.3)
-                U.list(listFrame, nil, 0)
-
-                local searchDd = U.new("TextBox", {
-                    Size = UDim2.new(1, -8, 0, 18), Position = UDim2.new(0, 4, 0, 2),
-                    BackgroundTransparency = 1, PlaceholderText = "Filter...",
-                    PlaceholderColor3 = ZalHub.theme.textDim, Text = "",
-                    TextColor3 = ZalHub.theme.text, TextSize = 10,
-                    Font = Enum.Font.Gotham, ClearTextOnFocus = false,
-                    ZIndex = 201, Parent = listFrame
-                })
-
-                local function renderItems()
-                    for _, c in ipairs(listFrame:GetChildren()) do
-                        if c ~= searchDd then c:Destroy() end
+                utility.stroke(box, Color3.fromRGB(50, 50, 50), 1)
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = box})
+                box.FocusLost:Connect(function()
+                    library.flags[flag] = box.Text
+                    if callback then
+                        callback(box.Text)
                     end
-                    local filter = string.lower(searchDd.Text)
-                    local y = 22
-                    for _, v in ipairs(values) do
-                        if filter == "" or string.find(string.lower(v), filter, 1, true) then
-                            local item = U.new("TextButton", {
-                                Size = UDim2.new(1, 0, 0, 22), BackgroundColor3 = ZalHub.theme.inputBg,
-                                BackgroundTransparency = 1, BorderSizePixel = 0,
-                                Text = "", ZIndex = 202, Parent = listFrame
-                            })
-                            local itemLbl = U.new("TextLabel", {
-                                Size = UDim2.new(1, -24, 1, 0), Position = UDim2.new(0, 6, 0, 0),
-                                BackgroundTransparency = 1, Text = v,
-                                TextColor3 = ZalHub.theme.textSub, TextSize = 11,
-                                Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
-                                ZIndex = 203, Parent = item
-                            })
-                            local chk = U.new("TextLabel", {
-                                Size = UDim2.new(0, 14, 1, 0), Position = UDim2.new(1, -18, 0, 0),
-                                BackgroundTransparency = 1, Text = "✓",
-                                TextColor3 = ZalHub.accent, TextSize = 11,
-                                Font = Enum.Font.GothamBold, Visible = false,
-                                ZIndex = 203, Parent = item
-                            })
-                            if not multi then
-                                chk.Visible = (default == v)
-                            else
-                                chk.Visible = table.find(ZalHub.flags[flag], v) ~= nil
-                            end
-
-                            item.MouseEnter:Connect(function()
-                                U.tween(item, 0.08, {BackgroundTransparency = 0.3, BackgroundColor3 = ZalHub.theme.elementHover})
-                                itemLbl.TextColor3 = ZalHub.theme.text
-                            end)
-                            item.MouseLeave:Connect(function()
-                                U.tween(item, 0.08, {BackgroundTransparency = 1})
-                                itemLbl.TextColor3 = ZalHub.theme.textSub
-                            end)
-
-                            item.MouseButton1Click:Connect(function()
-                                if not multi then
-                                    btnLbl.Text = v; btnLbl.TextColor3 = ZalHub.theme.text
-                                    ZalHub.flags[flag] = v
-                                    for _, d in ipairs(listFrame:GetDescendants()) do
-                                        if d:IsA("TextLabel") and d.Text == "✓" then d.Visible = false end
-                                    end
-                                    chk.Visible = true
-                                    listFrame.Visible = false
-                                    U.tween(listFrame, 0.15, {Size = UDim2.new(1, 0, 0, 0)})
-                                    U.tween(arrow, 0.1, {Rotation = 0})
-                                    if cb then cb(v) end
-                                else
-                                    local sel = ZalHub.flags[flag]
-                                    local idx = table.find(sel, v)
-                                    if idx then table.remove(sel, idx); chk.Visible = false
-                                    else table.insert(sel, v); chk.Visible = true end
-                                    if #sel == 0 then btnLbl.Text = "..."; btnLbl.TextColor3 = ZalHub.theme.textDim
-                                    elseif #sel <= 2 then btnLbl.Text = table.concat(sel, ", "); btnLbl.TextColor3 = ZalHub.theme.text
-                                    else btnLbl.Text = #sel .. " selected"; btnLbl.TextColor3 = ZalHub.theme.text end
-                                    if cb then cb(sel) end
-                                end
-                            end)
-                            y = y + 22
-                        end
-                    end
-                    listFrame.CanvasSize = UDim2.new(0, 0, 0, y)
+                end)
+            end
+            -- UPDATED DROPDOWN: now supports multi-selection!
+            -- Usage:
+            -- :Dropdown("Text", "flag", list, callback)          → single select (original behavior)
+            -- :Dropdown("Text", "flag", list, true, callback)   → multi-select
+            function sectionActions:Dropdown(text, flag, list, callbackOrMulti, callback)
+                local multi = false
+                local cb = nil
+                if typeof(callbackOrMulti) == "boolean" then
+                    multi = callbackOrMulti
+                    cb = callback
+                elseif typeof(callbackOrMulti) == "function" then
+                    cb = callbackOrMulti
                 end
 
-                searchDd:GetPropertyChangedSignal("Text"):Connect(renderItems)
-
+                local dropdown = utility.create("Frame", {
+                    Size = UDim2.new(1, 0, 0, 50),
+                    BackgroundTransparency = 1,
+                    ZIndex = 6,
+                    Parent = items
+                })
+                utility.create("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 20),
+                    BackgroundTransparency = 1,
+                    Text = text,
+                    TextColor3 = Color3.fromRGB(180, 180, 180),
+                    TextSize = 14,
+                    Font = Enum.Font.Code,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    ZIndex = 7,
+                    Parent = dropdown
+                })
+                local btn = utility.create("TextButton", {
+                    Size = UDim2.new(1, 0, 0, 24),
+                    Position = UDim2.new(0, 0, 0, 22),
+                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    BorderSizePixel = 0,
+                    Text = "Select...",
+                    TextColor3 = Color3.fromRGB(200, 200, 200),
+                    TextSize = 14,
+                    Font = Enum.Font.Code,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    ZIndex = 7,
+                    Parent = dropdown
+                })
+                utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+                -- Arrow indicator
+                utility.create("TextLabel", {
+                    Size = UDim2.new(0, 30, 1, 0),
+                    Position = UDim2.new(1, -35, 0, 0),
+                    BackgroundTransparency = 1,
+                    Text = "▼",
+                    TextColor3 = Color3.fromRGB(120, 120, 120),
+                    TextSize = 14,
+                    Font = Enum.Font.Code,
+                    ZIndex = 8,
+                    Parent = btn
+                })
+                local maxDropdownHeight = 200
+                local contentHeight = #list * 24
+                local listFrame = utility.create("ScrollingFrame", {
+                    Size = UDim2.new(1, 0, 0, contentHeight),
+                    Position = UDim2.new(0, 0, 1, 4),
+                    BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                    BorderSizePixel = 0,
+                    Visible = false,
+                    ZIndex = 11,
+                    ScrollBarThickness = 5,
+                    ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60),
+                    ScrollBarImageTransparency = 0.5,
+                    CanvasSize = UDim2.new(1, 0, 0, contentHeight),
+                    Parent = btn
+                })
+                utility.stroke(listFrame, Color3.fromRGB(50, 50, 50), 1)
+                utility.create("UIListLayout", {
+                    Padding = UDim.new(0, 2),
+                    Parent = listFrame
+                })
                 local opened = false
                 btn.MouseButton1Click:Connect(function()
                     opened = not opened
                     listFrame.Visible = opened
                     if opened then
-                        listFrame.Position = UDim2.new(0, btn.AbsolutePosition.X, 0, btn.AbsolutePosition.Y + btn.AbsoluteSize.Y + 2)
-                        local h = math.min(#values * 22 + 22, 154)
-                        U.tween(listFrame, 0.15, {Size = UDim2.new(1, 0, 0, h)})
-                        U.tween(arrow, 0.1, {Rotation = 180})
-                        renderItems()
+                        listFrame.Size = UDim2.new(1, 0, 0, math.min(contentHeight, maxDropdownHeight))
+                        listFrame.CanvasSize = UDim2.new(1, 0, 0, contentHeight)
+                        listFrame.CanvasPosition = Vector2.new(0, 0)
                     else
-                        U.tween(listFrame, 0.15, {Size = UDim2.new(1, 0, 0, 0)})
-                        U.tween(arrow, 0.1, {Rotation = 0})
+                        listFrame.Size = UDim2.new(1, 0, 0, 0)
                     end
                 end)
 
-                UIS.InputBegan:Connect(function(inp)
-                    if inp.UserInputType == Enum.UserInputType.MouseButton1 and listFrame and listFrame.Visible then
-                        local pos = UIS:GetMouseLocation()
-                        local r = listFrame.AbsolutePosition; local s = listFrame.AbsoluteSize
-                        if not (r.X <= pos.X and pos.X <= r.X + s.X and r.Y <= pos.Y and pos.Y <= r.Y + s.Y) then
+                if not multi then
+                    -- SINGLE SELECT (original behavior)
+                    for _, v in next, list do
+                        local item = utility.create("TextButton", {
+                            Size = UDim2.new(1, 0, 0, 24),
+                            BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                            BorderSizePixel = 0,
+                            Text = v,
+                            TextColor3 = Color3.fromRGB(160, 160, 160),
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            ZIndex = 12,
+                            Parent = listFrame
+                        })
+                        item.MouseButton1Click:Connect(function()
+                            btn.Text = v
+                            opened = false
                             listFrame.Visible = false
-                            U.tween(listFrame, 0.15, {Size = UDim2.new(1, 0, 0, 0)})
-                            U.tween(arrow, 0.1, {Rotation = 0})
-                        end
-                    end
-                end)
-            end
-
-            -- ═══ TEXTBOX ═══
-            function G:Input(opts)
-                opts = opts or {}
-                local text = opts.Text or "Input"
-                local flag = opts.Flag or text
-                local placeholder = opts.Placeholder or "..."
-                local cb = opts.Callback
-                ZalHub.flags[flag] = ""
-
-                local frame = U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1,
-                    ZIndex = 8, Parent = items
-                })
-                U.new("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1,
-                    Text = text, TextColor3 = ZalHub.theme.textSub,
-                    TextSize = 11, Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9, Parent = frame
-                })
-                local box = U.new("TextBox", {
-                    Size = UDim2.new(1, 0, 0, 22), Position = UDim2.new(0, 0, 0, 16),
-                    BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                    Text = "", PlaceholderText = placeholder,
-                    PlaceholderColor3 = ZalHub.theme.textDim,
-                    TextColor3 = ZalHub.theme.text, TextSize = 11,
-                    Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
-                    ClearTextOnFocus = false, ZIndex = 9, Parent = frame
-                })
-                U.corner(box, 2)
-                local bxStroke = U.stroke(box, ZalHub.theme.border, 1, 0.3)
-                U.pad(box, 0, 0, 6, 6)
-
-                box.Focused:Connect(function() U.tween(bxStroke, 0.1, {Color = ZalHub.accent, Transparency = 0}) end)
-                box.FocusLost:Connect(function()
-                    U.tween(bxStroke, 0.1, {Color = ZalHub.theme.border, Transparency = 0.3})
-                    ZalHub.flags[flag] = box.Text
-                    if cb then cb(box.Text) end
-                end)
-            end
-
-            -- ═══ BUTTON ═══
-            function G:Button(opts)
-                opts = opts or {}
-                local text = opts.Text or "Execute"
-                local cb = opts.Callback
-                local confirm = opts.Confirm or false
-
-                local btn = U.new("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 24),
-                    BackgroundColor3 = ZalHub.theme.elementBg, BorderSizePixel = 0,
-                    Text = text, TextColor3 = ZalHub.theme.text,
-                    TextSize = 11, Font = Enum.Font.GothamSemibold,
-                    ZIndex = 8, Parent = items
-                })
-                U.corner(btn, 2)
-                U.stroke(btn, ZalHub.theme.border, 1, 0.3)
-                U.hover(btn, ZalHub.theme.elementBg, ZalHub.theme.elementHover)
-
-                btn.MouseButton1Click:Connect(function()
-                    if confirm then
-                        if btn.Text == "CONFIRM?" then
-                            btn.Text = text; btn.TextColor3 = ZalHub.theme.text
-                            if cb then cb() end
-                        else
-                            btn.Text = "CONFIRM?"; btn.TextColor3 = ZalHub.theme.danger
-                            task.delay(2, function()
-                                if btn.Text == "CONFIRM?" then
-                                    btn.Text = text; btn.TextColor3 = ZalHub.theme.text
-                                end
-                            end)
-                        end
-                        return
-                    end
-                    U.tween(btn, 0.05, {BackgroundColor3 = ZalHub.accent})
-                    task.delay(0.1, function() U.tween(btn, 0.15, {BackgroundColor3 = ZalHub.theme.elementBg}) end)
-                    if cb then cb() end
-                end)
-            end
-
-            -- ═══ KEYBIND (standalone) with mode ═══
-            function G:Keybind(opts)
-                opts = opts or {}
-                local text = opts.Text or "Bind"
-                local flag = opts.Flag or text
-                local default = opts.Default or Enum.KeyCode.Unknown
-                local mode = opts.Mode or "Toggle"
-                local cb = opts.Callback
-                ZalHub.flags[flag] = {key = default, mode = mode}
-                local listening = false
-
-                local row = U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
-                    ZIndex = 8, Parent = items
-                })
-                U.new("TextLabel", {
-                    Size = UDim2.new(1, -110, 1, 0), BackgroundTransparency = 1,
-                    Text = text, TextColor3 = ZalHub.theme.textSub,
-                    TextSize = 11, Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9, Parent = row
-                })
-
-                local kBtn = U.new("TextButton", {
-                    Size = UDim2.new(0, 50, 0, 16), Position = UDim2.new(1, -105, 0.5, -8),
-                    BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                    Text = default == Enum.KeyCode.Unknown and "[-]" or "[" .. default.Name .. "]",
-                    TextColor3 = ZalHub.theme.textDim, TextSize = 9,
-                    Font = Enum.Font.RobotoMono, ZIndex = 9, Parent = row
-                })
-                U.corner(kBtn, 2)
-                U.stroke(kBtn, ZalHub.theme.border, 1, 0.5)
-
-                local modeBtn = U.new("TextButton", {
-                    Size = UDim2.new(0, 48, 0, 16), Position = UDim2.new(1, -52, 0.5, -8),
-                    BackgroundColor3 = ZalHub.theme.inputBg, BorderSizePixel = 0,
-                    Text = mode, TextColor3 = ZalHub.theme.textSub,
-                    TextSize = 9, Font = Enum.Font.Gotham, ZIndex = 9, Parent = row
-                })
-                U.corner(modeBtn, 2)
-                U.stroke(modeBtn, ZalHub.theme.border, 1, 0.5)
-
-                local function cycleMode()
-                    if mode == "Toggle" then mode = "Hold"
-                    elseif mode == "Hold" then mode = "Always"
-                    else mode = "Toggle" end
-                    modeBtn.Text = mode
-                    ZalHub.flags[flag].mode = mode
-                end
-
-                modeBtn.MouseButton1Click:Connect(cycleMode)
-
-                kBtn.MouseButton1Click:Connect(function()
-                    listening = true; kBtn.Text = "[...]"; kBtn.TextColor3 = ZalHub.accent
-                end)
-                UIS.InputBegan:Connect(function(input, gp)
-                    if listening and input.UserInputType == Enum.UserInputType.Keyboard then
-                        listening = false
-                        if input.KeyCode == Enum.KeyCode.Escape then
-                            ZalHub.flags[flag].key = Enum.KeyCode.Unknown; kBtn.Text = "[-]"
-                        else
-                            ZalHub.flags[flag].key = input.KeyCode; kBtn.Text = "[" .. input.KeyCode.Name .. "]"
-                        end
-                        kBtn.TextColor3 = ZalHub.theme.textDim
-                    elseif not listening and not gp and input.KeyCode == ZalHub.flags[flag].key then
-                        local m = ZalHub.flags[flag].mode
-                        if m == "Toggle" then
-                            ZalHub.flags[flag .. "_state"] = not ZalHub.flags[flag .. "_state"]
-                            if cb then cb(ZalHub.flags[flag .. "_state"]) end
-                        elseif m == "Hold" then
-                            ZalHub.flags[flag .. "_state"] = true
-                            if cb then cb(true) end
-                        elseif m == "Always" then
-                            -- always true while window exists, handled by script logic
-                        end
-                    end
-                end)
-                UIS.InputEnded:Connect(function(input)
-                    if not listening and ZalHub.flags[flag] and input.KeyCode == ZalHub.flags[flag].key then
-                        local m = ZalHub.flags[flag].mode
-                        if m == "Hold" then
-                            ZalHub.flags[flag .. "_state"] = false
-                            if cb then cb(false) end
-                        end
-                    end
-                end)
-            end
-
-            -- ═══ COLOR PICKER (standalone) ═══
-            function G:ColorPicker(opts)
-                opts = opts or {}
-                local text = opts.Text or "Color"
-                local flag = opts.Flag or text
-                local default = opts.Default or Color3.new(1, 1, 1)
-                local cb = opts.Callback
-                ZalHub.flags[flag] = default
-
-                local frame = U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1,
-                    ZIndex = 8, Parent = items
-                })
-                U.new("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1,
-                    Text = text, TextColor3 = ZalHub.theme.textSub,
-                    TextSize = 11, Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9, Parent = frame
-                })
-                local cBtn = U.new("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 22), Position = UDim2.new(0, 0, 0, 16),
-                    BackgroundColor3 = default, BorderSizePixel = 0,
-                    Text = "", ZIndex = 9, Parent = frame
-                })
-                U.corner(cBtn, 2)
-                U.stroke(cBtn, ZalHub.theme.border, 1, 0.3)
-
-                local function openPicker()
-                    local picker = U.new("Frame", {
-                        Size = UDim2.new(0, 220, 0, 180),
-                        BackgroundColor3 = ZalHub.theme.panelBg, BorderSizePixel = 0,
-                        ZIndex = 250, Parent = overlay
-                    })
-                    U.corner(picker, 3)
-                    U.stroke(picker, ZalHub.accent, 1)
-                    picker.Position = UDim2.new(0, math.clamp(cBtn.AbsolutePosition.X - 100, 0, 500), 0,
-                        cBtn.AbsolutePosition.Y + cBtn.AbsoluteSize.Y + 5)
-
-                    local svBox = U.new("ImageButton", {
-                        Size = UDim2.new(0, 150, 0, 150), Position = UDim2.new(0, 5, 0, 5),
-                        BackgroundColor3 = Color3.new(1,1,1), Image = "rbxassetid://284402810",
-                        BorderSizePixel = 0, ZIndex = 251, Parent = picker
-                    })
-                    U.corner(svBox, 2)
-                    local svGrad = U.new("UIGradient", {
-                        Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(1, Color3.fromHSV(0,1,1))},
-                        Rotation = 0, Parent = svBox
-                    })
-                    local wbGrad = U.new("UIGradient", {
-                        Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1)},
-                        Rotation = 90, Parent = svBox
-                    })
-                    local svCursor = U.new("Frame", {
-                        Size = UDim2.new(0, 8, 0, 8), BackgroundColor3 = Color3.new(1,1,1),
-                        BorderSizePixel = 0, ZIndex = 252, Parent = svBox
-                    })
-                    U.corner(svCursor, 4)
-                    U.stroke(svCursor, Color3.new(0,0,0), 1)
-                    svCursor.Position = UDim2.new(1, -4, 0, -4)
-
-                    local hueBar = U.new("ImageButton", {
-                        Size = UDim2.new(0, 18, 0, 150), Position = UDim2.new(0, 160, 0, 5),
-                        BackgroundColor3 = Color3.new(1,1,1), Image = "rbxassetid://284402810",
-                        BorderSizePixel = 0, ZIndex = 251, Parent = picker
-                    })
-                    U.corner(hueBar, 2)
-                    U.new("UIGradient", {
-                        Color = ColorSequence.new{
-                            ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
-                            ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255,255,0)),
-                            ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)),
-                            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
-                            ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0,0,255)),
-                            ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255,0,255)),
-                            ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0)),
-                        }, Rotation = 90, Parent = hueBar
-                    })
-                    local hueCursor = U.new("Frame", {
-                        Size = UDim2.new(0, 22, 0, 4), BackgroundColor3 = Color3.new(1,1,1),
-                        BorderSizePixel = 0, ZIndex = 252, Parent = hueBar
-                    })
-                    U.stroke(hueCursor, Color3.new(0,0,0), 1)
-                    hueCursor.Position = UDim2.new(0, -2, 0, -2)
-
-                    local alphaBar = U.new("ImageButton", {
-                        Size = UDim2.new(0, 18, 0, 150), Position = UDim2.new(0, 183, 0, 5),
-                        BackgroundColor3 = Color3.new(1,1,1), Image = "rbxassetid://284402810",
-                        BorderSizePixel = 0, ZIndex = 251, Parent = picker
-                    })
-                    U.corner(alphaBar, 2)
-                    local alphaGrad = U.new("UIGradient", {
-                        Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1)},
-                        Rotation = 90, Parent = alphaBar
-                    })
-                    local alphaCursor = U.new("Frame", {
-                        Size = UDim2.new(0, 22, 0, 4), BackgroundColor3 = Color3.new(1,1,1),
-                        BorderSizePixel = 0, ZIndex = 252, Parent = alphaBar
-                    })
-                    U.stroke(alphaCursor, Color3.new(0,0,0), 1)
-                    alphaCursor.Position = UDim2.new(0, -2, 1, -2)
-
-                    local h,s,v = default:ToHSV()
-                    local alpha = 1
-                    local function updateColor()
-                        local col = Color3.fromHSV(h, s, v)
-                        cBtn.BackgroundColor3 = col
-                        ZalHub.flags[flag] = col
-                        if cb then cb(col, alpha) end
-                    end
-
-                    local function updateSV()
-                        svGrad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(1, Color3.fromHSV(h,1,1))}
-                        svCursor.Position = UDim2.new(s, -4, 1-v, -4)
-                        updateColor()
-                    end
-
-                    local svDrag, hueDrag, alphaDrag = false, false, false
-                    svBox.InputBegan:Connect(function(inp)
-                        if inp.UserInputType == Enum.UserInputType.MouseButton1 then svDrag = true end
-                    end)
-                    hueBar.InputBegan:Connect(function(inp)
-                        if inp.UserInputType == Enum.UserInputType.MouseButton1 then hueDrag = true end
-                    end)
-                    alphaBar.InputBegan:Connect(function(inp)
-                        if inp.UserInputType == Enum.UserInputType.MouseButton1 then alphaDrag = true end
-                    end)
-                    UIS.InputChanged:Connect(function(inp)
-                        if svDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                            local mx = (inp.Position.X - svBox.AbsolutePosition.X) / svBox.AbsoluteSize.X
-                            local my = (inp.Position.Y - svBox.AbsolutePosition.Y) / svBox.AbsoluteSize.Y
-                            s = math.clamp(mx, 0, 1); v = 1 - math.clamp(my, 0, 1)
-                            updateSV()
-                        elseif hueDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                            local my = (inp.Position.Y - hueBar.AbsolutePosition.Y) / hueBar.AbsoluteSize.Y
-                            h = math.clamp(my, 0, 1)
-                            hueCursor.Position = UDim2.new(0, -2, h, -2)
-                            updateSV()
-                        elseif alphaDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                            local my = (inp.Position.Y - alphaBar.AbsolutePosition.Y) / alphaBar.AbsoluteSize.Y
-                            alpha = 1 - math.clamp(my, 0, 1)
-                            alphaCursor.Position = UDim2.new(0, -2, 1-alpha, -2)
-                            updateColor()
-                        end
-                    end)
-                    UIS.InputEnded:Connect(function(inp)
-                        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                            svDrag, hueDrag, alphaDrag = false, false, false
-                        end
-                    end)
-
-                    local conn
-                    conn = UIS.InputBegan:Connect(function(inp)
-                        if inp.UserInputType == Enum.UserInputType.MouseButton1 and picker then
-                            local pos = UIS:GetMouseLocation()
-                            if not (picker.AbsolutePosition.X <= pos.X and pos.X <= picker.AbsolutePosition.X + picker.AbsoluteSize.X
-                                and picker.AbsolutePosition.Y <= pos.Y and pos.Y <= picker.AbsolutePosition.Y + picker.AbsoluteSize.Y) then
-                                picker:Destroy()
-                                conn:Disconnect()
+                            listFrame.Size = UDim2.new(1, 0, 0, 0)
+                            library.flags[flag] = v
+                            if cb then
+                                cb(v)
                             end
+                        end)
+                    end
+                else
+                    -- MULTI SELECT (new!)
+                    local selected = library.flags[flag]
+                    if not selected or typeof(selected) ~= "table" then
+                        selected = {}
+                        library.flags[flag] = selected
+                    end
+
+                    local function updateButtonText()
+                        if #selected == 0 then
+                            btn.Text = "Select..."
+                        elseif #selected == 1 then
+                            btn.Text = selected[1]
+                        elseif #selected <= 3 then
+                            btn.Text = table.concat(selected, ", ")
+                        else
+                            btn.Text = #selected .. " selected"
                         end
-                    end)
-                    updateSV()
+                    end
+                    updateButtonText()
+
+                    for _, v in next, list do
+                        local item = utility.create("TextButton", {
+                            Size = UDim2.new(1, 0, 0, 24),
+                            BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                            BorderSizePixel = 0,
+                            Text = "",
+                            TextColor3 = Color3.fromRGB(160, 160, 160),
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            ZIndex = 12,
+                            Parent = listFrame
+                        })
+
+                        local itemText = utility.create("TextLabel", {
+                            Size = UDim2.new(1, -30, 1, 0),
+                            Position = UDim2.new(0, 5, 0, 0),
+                            BackgroundTransparency = 1,
+                            Text = v,
+                            TextColor3 = Color3.fromRGB(160, 160, 160),
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            ZIndex = 13,
+                            Parent = item
+                        })
+
+                        local check = utility.create("TextLabel", {
+                            Size = UDim2.new(0, 20, 1, 0),
+                            Position = UDim2.new(1, -25, 0, 0),
+                            BackgroundTransparency = 1,
+                            Text = "✔",
+                            TextColor3 = library.accent,
+                            TextSize = 14,
+                            Font = Enum.Font.Code,
+                            TextXAlignment = Enum.TextXAlignment.Center,
+                            ZIndex = 13,
+                            Parent = item
+                        })
+                        check.Visible = table.find(selected, v) ~= nil
+
+                        item.MouseButton1Click:Connect(function()
+                            local idx = table.find(selected, v)
+                            if idx then
+                                table.remove(selected, idx)
+                                check.Visible = false
+                            else
+                                table.insert(selected, v)
+                                check.Visible = true
+                            end
+                            updateButtonText()
+                            if cb then
+                                cb(selected)
+                            end
+                        end)
+                    end
                 end
-                cBtn.MouseButton1Click:Connect(openPicker)
             end
-
-            -- ═══ SEPARATOR ═══
-            function G:Separator()
-                U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 8), BackgroundTransparency = 1,
-                    ZIndex = 8, Parent = items
+            -- MODIFIED SLIDER (thinner bar, value as current/max, matches pic)
+            function sectionActions:Slider(text, flag, min, max, default, callback)
+                local slider = utility.create("Frame", {
+                    Size = UDim2.new(1, 0, 0, 40),
+                    BackgroundTransparency = 1,
+                    ZIndex = 6,
+                    Parent = items
                 })
-                U.new("Frame", {
-                    Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 0.5, 0),
-                    BackgroundColor3 = ZalHub.theme.separator, BorderSizePixel = 0,
-                    ZIndex = 9, Parent = items
-                })
-            end
-
-            -- ═══ LABEL ═══
-            function G:Label(txt)
-                U.new("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1,
-                    Text = txt, TextColor3 = ZalHub.theme.textDim,
-                    TextSize = 10, Font = Enum.Font.Gotham, TextWrapped = true,
+                utility.create("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 20),
+                    BackgroundTransparency = 1,
+                    Text = text,
+                    TextColor3 = Color3.fromRGB(180, 180, 180),
+                    TextSize = 13,
+                    Font = Enum.Font.Code,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 8, Parent = items
+                    ZIndex = 7,
+                    Parent = slider
                 })
+                local sliderBar = utility.create("Frame", {
+                    Size = UDim2.new(1, 0, 0, 20),
+                    Position = UDim2.new(0, 0, 0, 20),
+                    BackgroundTransparency = 1,
+                    Parent = slider
+                })
+                local bg = utility.create("TextButton", {
+                    Size = UDim2.new(1, 0, 0, 20),
+                    Position = UDim2.new(0, 0, 0.5, -10),
+                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    Text = "",
+                    ZIndex = 7,
+                    Parent = sliderBar
+                })
+                utility.stroke(bg, Color3.fromRGB(50, 50, 50), 1)
+                bg.ClipsDescendants = true
+                local fill = utility.create("Frame", {
+                    Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+                    BackgroundColor3 = library.accent,
+                    BorderSizePixel = 0,
+                    ZIndex = 8,
+                    Parent = bg
+                })
+                local fillGradient = utility.create("UIGradient", {
+                    Color = utility.gradient(library.outline),
+                    Rotation = 0,
+                    Parent = fill
+                })
+                local val = utility.create("TextLabel", {
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Size = UDim2.new(1, 0, 1, 0),
+                    Position = UDim2.new(0.5, 0, 0.5, 0),
+                    BackgroundTransparency = 1,
+                    Text = string.format("%.2f/%.2f", default, max),
+                    TextColor3 = Color3.fromRGB(255, 255, 255),
+                    TextSize = 13,
+                    Font = Enum.Font.Code,
+                    TextXAlignment = Enum.TextXAlignment.Center,
+                    ZIndex = 9,
+                    Parent = bg
+                })
+                local function update(input)
+                    local perc = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+                    local rawValue = min + (max - min) * perc
+                    local value = tonumber(string.format("%.2f", rawValue))
+                    utility.tween(fill, {0.1}, {Size = UDim2.new(perc, 0, 1, 0)})
+                    val.Text = string.format("%.2f/%.2f", value, max)
+                    library.flags[flag] = value
+                    if callback then
+                        callback(value)
+                    end
+                end
+                local dragging = false
+                bg.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        update(input)
+                    end
+                end)
+                services.UserInputService.InputChanged:Connect(function(input)
+                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        update(input)
+                    end
+                end)
+                services.UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = false
+                    end
+                end)
             end
-
-            return G
+            function sectionActions:Button(text, callback)
+                local btn = utility.create("TextButton", {
+                    Size = UDim2.new(1, 0, 0, 34),
+                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    BorderSizePixel = 0,
+                    Text = text,
+                    TextColor3 = Color3.fromRGB(200, 200, 200),
+                    TextSize = 14,
+                    Font = Enum.Font.Code,
+                    ZIndex = 6,
+                    Parent = items
+                })
+                utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+                btn.MouseButton1Click:Connect(function()
+                    if callback then
+                        callback()
+                    end
+                end)
+            end
+            return sectionActions
         end
-
-        return Tab
+        return tabActions
     end
-
-    -- ═══ GLOBAL SEARCH ═══
+    -- Global search logic
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(searchBox.Text)
-        for _, col in ipairs({leftCol, rightCol}) do
-            for _, group in ipairs(col:GetChildren()) do
-                if group.Name:find("Group_") then
-                    local title = group:FindFirstChild("Group_") and group:FindFirstChild("Group_"):FindFirstChild("TextLabel")
-                    if title then
-                        group.Visible = query == "" or string.find(string.lower(title.Text), query, 1, true) ~= nil
+       
+        if currentTab and currentTab.LeftCol and currentTab.RightCol then
+            local cols = {currentTab.LeftCol, currentTab.RightCol}
+           
+            for _, col in ipairs(cols) do
+                for _, child in ipairs(col:GetChildren()) do
+                    if child.Name == "ZalSection" then
+                        local title = child:FindFirstChildWhichIsA("TextLabel")
+                        if title then
+                            local match = (query == "") or string.find(string.lower(title.Text), query, 1, true)
+                            child.Visible = match
+                        end
                     end
                 end
+               
+                col.CanvasPosition = Vector2.new(0, 0)
             end
+           
+            task.delay(0.05, function()
+                if currentTab.LeftCol then
+                    local leftList = currentTab.LeftCol:FindFirstChild("UIListLayout")
+                    if leftList then
+                        currentTab.LeftCol.CanvasSize = UDim2.new(0, 0, 0, leftList.AbsoluteContentSize.Y + 20)
+                    end
+                end
+                if currentTab.RightCol then
+                    local rightList = currentTab.RightCol:FindFirstChild("UIListLayout")
+                    if rightList then
+                        currentTab.RightCol.CanvasSize = UDim2.new(0, 0, 0, rightList.AbsoluteContentSize.Y + 20)
+                    end
+                end
+            end)
         end
     end)
-
-    return Window
+    return windowActions
 end
-
-function ZalHub:Destroy()
-    ZalHub.unloaded = true
-    for _, g in ipairs(CoreGui:GetChildren()) do
-        if g.Name:find("ZalHub") then g:Destroy() end
-    end
-end
-
-return ZalHub
+return library 
