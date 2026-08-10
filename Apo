@@ -1,18 +1,22 @@
-repeat
-    wait()
-until game:IsLoaded()
+repeat task.wait() until game:IsLoaded()
 
 local library = {
     flags = {},
-    accent = Color3.fromRGB(117, 52, 235),
-    outline = { Color3.fromRGB(117, 52, 235), Color3.fromRGB(200, 100, 255) },
+    accent = Color3.fromRGB(130, 80, 255),
+    outline = {Color3.fromRGB(130, 80, 255), Color3.fromRGB(200, 140, 255)},
     toggled = true,
-    -- Default theme can be changed via library:SetAccent(color3)
 }
 
 function library:SetAccent(color)
     library.accent = color
-    library.outline = { color, Color3.fromRGB(math.min(color.R*255+100,255), math.min(color.G*255+50,255), math.min(color.B*255+100,255)) }
+    library.outline = {
+        color,
+        Color3.fromRGB(
+            math.min(color.R * 255 + 90, 255),
+            math.min(color.G * 255 + 50, 255),
+            math.min(color.B * 255 + 90, 255)
+        )
+    }
 end
 
 local services = setmetatable({}, {
@@ -22,6 +26,7 @@ local services = setmetatable({}, {
 })
 
 local utility = {}
+
 function utility.create(class, properties)
     local obj = Instance.new(class)
     for prop, v in next, properties do
@@ -29,57 +34,120 @@ function utility.create(class, properties)
     end
     return obj
 end
+
 function utility.gradient(colors)
-    local colortbl = {}
+    local keypoints = {}
     for i, color in next, colors do
-        table.insert(colortbl, ColorSequenceKeypoint.new((i -1) / (#colors - 1), color))
+        table.insert(keypoints, ColorSequenceKeypoint.new((i - 1) / (#colors - 1), color))
     end
-    return ColorSequence.new(colortbl)
+    return ColorSequence.new(keypoints)
 end
+
 function utility.tween(obj, info, props)
     local tween = services.TweenService:Create(obj, TweenInfo.new(unpack(info)), props)
     tween:Play()
     return tween
 end
-function utility.stroke(obj, color, thickness)
+
+function utility.stroke(obj, color, thickness, transparency)
     local stroke = Instance.new("UIStroke")
-    stroke.Color = color or Color3.fromRGB(50,50,50)
+    stroke.Color = color or Color3.fromRGB(60, 60, 60)
     stroke.Thickness = thickness or 1
-    stroke.Transparency = 0.5
+    stroke.Transparency = transparency or 0.4
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     stroke.Parent = obj
     return stroke
 end
+
 function utility.dragify(object, inputFrame)
     local dragging, dragInput, dragStart, startPos
-    local targetInput = inputFrame or object
-    targetInput.InputBegan:Connect(function(input)
+    local target = inputFrame or object
+
+    target.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = object.Position
-            local connection
-            connection = input.Changed:Connect(function()
+
+            local conn
+            conn = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
-                    connection:Disconnect()
+                    conn:Disconnect()
                 end
             end)
         end
     end)
-    targetInput.InputChanged:Connect(function(input)
+
+    target.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
         end
     end)
+
     services.UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
-            object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            object.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
 
--- Notification system (unchanged, kept for reference)
+-- ===================== HSV / RGB Helpers =====================
+local function RGBToHSV(r, g, b)
+    r, g, b = r / 255, g / 255, b / 255
+    local max, min = math.max(r, g, b), math.min(r, g, b)
+    local h, s, v = 0, 0, max
+    local d = max - min
+
+    s = max == 0 and 0 or d / max
+
+    if max == min then
+        h = 0
+    else
+        if max == r then
+            h = (g - b) / d + (g < b and 6 or 0)
+        elseif max == g then
+            h = (b - r) / d + 2
+        else
+            h = (r - g) / d + 4
+        end
+        h = h / 6
+    end
+    return h, s, v
+end
+
+local function HSVToRGB(h, s, v)
+    local r, g, b
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+    local p = v * (1 - s)
+    local q = v * (1 - f * s)
+    local t = v * (1 - (1 - f) * s)
+
+    i = i % 6
+    if i == 0 then r, g, b = v, t, p
+    elseif i == 1 then r, g, b = q, v, p
+    elseif i == 2 then r, g, b = p, v, t
+    elseif i == 3 then r, g, b = p, q, v
+    elseif i == 4 then r, g, b = t, p, v
+    else r, g, b = v, p, q end
+
+    return math.floor(r * 255), math.floor(g * 255), math.floor(b * 255)
+end
+
+local function Color3ToHex(color)
+    return string.format("#%02X%02X%02X",
+        math.floor(color.R * 255),
+        math.floor(color.G * 255),
+        math.floor(color.B * 255)
+    )
+end
+
+-- ===================== Notification System =====================
 local notifyHolder = game:GetService("CoreGui"):FindFirstChild("ZalHub_NotifyHolder")
 if not notifyHolder then
     notifyHolder = utility.create("ScreenGui", {
@@ -90,112 +158,119 @@ if not notifyHolder then
     })
     utility.create("UIListLayout", {
         Parent = notifyHolder,
-        Padding = UDim.new(0, 8),
+        Padding = UDim.new(0, 10),
         SortOrder = Enum.SortOrder.LayoutOrder,
         VerticalAlignment = Enum.VerticalAlignment.Bottom,
         HorizontalAlignment = Enum.HorizontalAlignment.Right
     })
     utility.create("UIPadding", {
         Parent = notifyHolder,
-        PaddingBottom = UDim.new(0, 80),
-        PaddingRight = UDim.new(0, 10)
+        PaddingBottom = UDim.new(0, 90),
+        PaddingRight = UDim.new(0, 15)
     })
 end
 
 function library:Notify(options)
     if not notifyHolder then return end
+
     local notifyFrame = utility.create("Frame", {
-        Size = UDim2.new(0, 300, 0, 0),
-        Position = UDim2.new(1, 330, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+        Size = UDim2.new(0, 310, 0, 0),
+        Position = UDim2.new(1, 340, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(18, 18, 22),
         BorderSizePixel = 0,
         Parent = notifyHolder,
-        AnchorPoint = Vector2.new(1,1)
+        AnchorPoint = Vector2.new(1, 1)
     })
     notifyFrame.AutomaticSize = Enum.AutomaticSize.Y
-    utility.stroke(notifyFrame, library.accent, 1)
-    local border = utility.create("Frame", {
-        Size = UDim2.new(1, 4, 1, 4),
-        Position = UDim2.new(0, -2, 0, -2),
-        BackgroundColor3 = Color3.fromRGB(255,255,255),
-        BorderSizePixel = 0,
-        ZIndex = 0,
-        Parent = notifyFrame
-    })
-    utility.create("UIGradient", {
-        Rotation = 45,
-        Color = utility.gradient(library.outline),
-        Parent = border
-    })
-    local contentFrame = utility.create("Frame", {
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = notifyFrame})
+    utility.stroke(notifyFrame, library.accent, 1.2, 0.3)
+
+    local accentBar = utility.create("Frame", {
+        Size = UDim2.new(0, 4, 1, 0),
+        BackgroundColor3 = library.accent,
         BorderSizePixel = 0,
         Parent = notifyFrame
     })
-    contentFrame.AutomaticSize = Enum.AutomaticSize.Y
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = accentBar})
+
+    local content = utility.create("Frame", {
+        Size = UDim2.new(1, -20, 0, 0),
+        Position = UDim2.new(0, 16, 0, 12),
+        BackgroundTransparency = 1,
+        AutomaticSize = Enum.AutomaticSize.Y,
+        Parent = notifyFrame
+    })
     utility.create("UIListLayout", {
-        Parent = contentFrame,
-        Padding = UDim.new(0, 6)
+        Parent = content,
+        Padding = UDim.new(0, 4),
+        SortOrder = Enum.SortOrder.LayoutOrder
     })
+
     utility.create("TextLabel", {
-        Size = UDim2.new(1, -12, 0, 24),
-        Position = UDim2.new(0, 6, 0, 6),
+        Size = UDim2.new(1, 0, 0, 20),
         BackgroundTransparency = 1,
         Text = options.Title or "Notification",
         TextColor3 = library.accent,
         TextSize = 15,
-        Font = Enum.Font.Code,
+        Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 2,
-        Parent = contentFrame
+        Parent = content
     })
+
     utility.create("TextLabel", {
-        Size = UDim2.new(1, -12, 0, 0),
-        Position = UDim2.new(0, 6, 0, 0),
+        Size = UDim2.new(1, 0, 0, 0),
         BackgroundTransparency = 1,
-        Text = options.Content or "Message",
-        TextColor3 = Color3.fromRGB(200, 200, 200),
+        Text = options.Content or "",
+        TextColor3 = Color3.fromRGB(200, 200, 210),
         TextSize = 13,
-        Font = Enum.Font.Code,
+        Font = Enum.Font.Gotham,
         TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,
         AutomaticSize = Enum.AutomaticSize.Y,
-        ZIndex = 2,
-        Parent = contentFrame
+        Parent = content
     })
-    local duration = options.Duration or 5
-    utility.tween(notifyFrame, {0.4, Enum.EasingStyle.Back}, {Position = UDim2.new(1, -10, 1, -10)})
+
+    utility.create("Frame", {
+        Size = UDim2.new(1, 0, 0, 8),
+        BackgroundTransparency = 1,
+        Parent = content
+    })
+
+    utility.tween(notifyFrame, {0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out}, {
+        Position = UDim2.new(1, -15, 1, -15)
+    })
+
     task.spawn(function()
-        task.wait(duration)
-        utility.tween(notifyFrame, {0.4, Enum.EasingStyle.Quad}, {Position = UDim2.new(1, 330, 1, 0)})
-        task.wait(0.5)
+        task.wait(options.Duration or 4.5)
+        utility.tween(notifyFrame, {0.35, Enum.EasingStyle.Quad}, {
+            Position = UDim2.new(1, 340, 1, 0)
+        })
+        task.wait(0.4)
         notifyFrame:Destroy()
     end)
 end
 
--- Main Window creation
+-- ===================== Main Window =====================
 function library:Window(name)
     local gui = utility.create("ScreenGui", {
         Name = "ZalHub",
-        Parent = game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"),
-        ResetOnSpawn = false
+        Parent = game:GetService("CoreGui") or game.Players.LocalPlayer:WaitForChild("PlayerGui"),
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     })
+
     local holder = utility.create("Frame", {
         Name = "Holder",
-        Size = UDim2.new(0, 600, 0, 650),
-        Position = UDim2.new(0.5, -300, 0.5, -325),
-        BackgroundColor3 = Color3.fromRGB(10, 10, 10),
+        Size = UDim2.new(0, 620, 0, 680),
+        Position = UDim2.new(0.5, -310, 0.5, -340),
+        BackgroundColor3 = Color3.fromRGB(12, 12, 16),
         BorderSizePixel = 0,
         ClipsDescendants = true,
         Parent = gui
     })
-    utility.create("UICorner", {
-        CornerRadius = UDim.new(0, 8),
-        Parent = holder
-    })
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 12), Parent = holder})
 
-    -- Toggle GUI / Watermark (kept and improved)
+    -- Toggle Button
     local toggleGui = utility.create("ScreenGui", {
         Name = "ZalHub_Toggle",
         Parent = game:GetService("CoreGui"),
@@ -203,277 +278,257 @@ function library:Window(name)
         DisplayOrder = 999
     })
     local toggleBtn = utility.create("TextButton", {
-        Name = "ToggleBtn",
-        Size = UDim2.new(0, 140, 0, 40),
-        Position = UDim2.new(0, 20, 0, 10),
-        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+        Size = UDim2.new(0, 150, 0, 38),
+        Position = UDim2.new(0, 18, 0, 12),
+        BackgroundColor3 = Color3.fromRGB(18, 18, 22),
         BorderSizePixel = 0,
-        Text = "ZalHub [ON]",
+        Text = "ZalHub  [ON]",
         TextColor3 = library.accent,
-        Font = Enum.Font.Code,
-        TextSize = 16,
-        ZIndex = 100,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
         Parent = toggleGui
     })
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = toggleBtn})
-    local toggleStroke = utility.stroke(toggleBtn, library.accent, 1)
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = toggleBtn})
+    local toggleStroke = utility.stroke(toggleBtn, library.accent, 1.2, 0.25)
+
     local isOpen = true
     local function toggleWindow()
         isOpen = not isOpen
         holder.Visible = isOpen
         if isOpen then
-            toggleBtn.Text = "ZalHub [ON]"
+            toggleBtn.Text = "ZalHub  [ON]"
             toggleBtn.TextColor3 = library.accent
             toggleStroke.Color = library.accent
         else
-            toggleBtn.Text = "ZalHub [OFF]"
-            toggleBtn.TextColor3 = Color3.fromRGB(80, 80, 80)
-            toggleStroke.Color = Color3.fromRGB(80, 80, 80)
+            toggleBtn.Text = "ZalHub  [OFF]"
+            toggleBtn.TextColor3 = Color3.fromRGB(90, 90, 100)
+            toggleStroke.Color = Color3.fromRGB(60, 60, 70)
         end
     end
     toggleBtn.MouseButton1Click:Connect(toggleWindow)
-    services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.RightShift then
+    services.UserInputService.InputBegan:Connect(function(input, gp)
+        if not gp and input.KeyCode == Enum.KeyCode.RightShift then
             toggleWindow()
         end
     end)
     utility.dragify(toggleBtn, toggleBtn)
 
-    -- Main background with gradient border
+    -- Main Background
     local mainBG = utility.create("Frame", {
         Size = UDim2.new(1, 0, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+        BackgroundColor3 = Color3.fromRGB(14, 14, 18),
         BorderSizePixel = 0,
-        ZIndex = 1,
         Parent = holder
     })
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = mainBG})
-    -- Outer gradient border (hidden under mainBG)
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 12), Parent = mainBG})
+
+    -- Outer glow border
     local outerBorder = utility.create("Frame", {
         Size = UDim2.new(1, 4, 1, 4),
         Position = UDim2.new(0, -2, 0, -2),
-        BackgroundColor3 = Color3.fromRGB(255,255,255),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
         ZIndex = 0,
         Parent = mainBG
     })
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 14), Parent = outerBorder})
     utility.create("UIGradient", {
         Rotation = 45,
         Color = utility.gradient(library.outline),
         Parent = outerBorder
     })
 
-    -- Top bar with title, minimize, and search
+    -- Top Bar
     local topBar = utility.create("Frame", {
-        Size = UDim2.new(1, 0, 0, 50),
-        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        Size = UDim2.new(1, 0, 0, 52),
+        BackgroundColor3 = Color3.fromRGB(18, 18, 23),
         BorderSizePixel = 0,
-        ZIndex = 2,
+        ZIndex = 5,
         Parent = mainBG
     })
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = topBar})
-    utility.create("Frame", { -- filler for bottom corners
-        Size = UDim2.new(1, 0, 0, 8),
-        Position = UDim2.new(0, 0, 1, -8),
-        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 12), Parent = topBar})
+    utility.create("Frame", {
+        Size = UDim2.new(1, 0, 0, 14),
+        Position = UDim2.new(0, 0, 1, -14),
+        BackgroundColor3 = Color3.fromRGB(18, 18, 23),
         BorderSizePixel = 0,
-        ZIndex = 2,
         Parent = topBar
     })
 
     -- Title
     utility.create("TextLabel", {
-        Size = UDim2.new(0, 160, 1, 0),
-        Position = UDim2.new(0, 16, 0, 0),
+        Size = UDim2.new(0, 180, 1, 0),
+        Position = UDim2.new(0, 18, 0, 0),
         BackgroundTransparency = 1,
         Text = name,
         TextColor3 = library.accent,
         TextSize = 18,
-        Font = Enum.Font.Code,
+        Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 3,
         Parent = topBar
     })
 
-    -- Minimize button
+    -- Minimize
     local minimizeBtn = utility.create("TextButton", {
-        Size = UDim2.new(0, 30, 0, 30),
-        Position = UDim2.new(1, -50, 0.5, -15),
-        BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+        Size = UDim2.new(0, 32, 0, 32),
+        Position = UDim2.new(1, -48, 0.5, -16),
+        BackgroundColor3 = Color3.fromRGB(28, 28, 34),
         BorderSizePixel = 0,
         Text = "−",
-        TextColor3 = Color3.fromRGB(200, 200, 200),
-        TextSize = 18,
-        Font = Enum.Font.Code,
-        ZIndex = 5,
+        TextColor3 = Color3.fromRGB(200, 200, 210),
+        TextSize = 20,
+        Font = Enum.Font.GothamBold,
         Parent = topBar
     })
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = minimizeBtn})
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 7), Parent = minimizeBtn})
     minimizeBtn.MouseButton1Click:Connect(toggleWindow)
 
-    -- Search bar
+    -- Search
     local searchContainer = utility.create("Frame", {
-        Name = "GlobalSearch",
-        Size = UDim2.new(0, 200, 0, 32),
-        Position = UDim2.new(1, -260, 0.5, -16),
-        BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+        Size = UDim2.new(0, 210, 0, 32),
+        Position = UDim2.new(1, -270, 0.5, -16),
+        BackgroundColor3 = Color3.fromRGB(22, 22, 28),
         BorderSizePixel = 0,
-        ZIndex = 5,
         Parent = topBar
     })
-    utility.stroke(searchContainer, Color3.fromRGB(50, 50, 50), 1)
-    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = searchContainer})
+    utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = searchContainer})
+    utility.stroke(searchContainer, Color3.fromRGB(45, 45, 55), 1, 0.5)
+
     utility.create("TextLabel", {
-        Size = UDim2.new(0, 25, 1, 0),
+        Size = UDim2.new(0, 28, 1, 0),
         BackgroundTransparency = 1,
-        Text = "🔍",
-        TextColor3 = Color3.fromRGB(100, 100, 100),
-        TextSize = 14,
-        Font = Enum.Font.Code,
-        ZIndex = 6,
-        Parent = searchContainer
-    })
-    local searchBox = utility.create("TextBox", {
-        Size = UDim2.new(1, -30, 1, -6),
-        Position = UDim2.new(0, 28, 0, 3),
-        BackgroundTransparency = 1,
-        Text = "",
-        PlaceholderText = "Search...",
-        PlaceholderColor3 = Color3.fromRGB(80, 80, 80),
-        TextColor3 = Color3.fromRGB(200, 200, 200),
-        TextSize = 14,
-        Font = Enum.Font.Code,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ClearTextOnFocus = false,
-        ZIndex = 6,
+        Text = "⌕",
+        TextColor3 = Color3.fromRGB(110, 110, 130),
+        TextSize = 16,
+        Font = Enum.Font.Gotham,
         Parent = searchContainer
     })
 
-    -- Tab bar
+    local searchBox = utility.create("TextBox", {
+        Size = UDim2.new(1, -34, 1, -6),
+        Position = UDim2.new(0, 30, 0, 3),
+        BackgroundTransparency = 1,
+        Text = "",
+        PlaceholderText = "Search features...",
+        PlaceholderColor3 = Color3.fromRGB(90, 90, 110),
+        TextColor3 = Color3.fromRGB(220, 220, 230),
+        TextSize = 13,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false,
+        Parent = searchContainer
+    })
+
+    -- Tab Bar
     local tabBar = utility.create("Frame", {
-        Size = UDim2.new(1, 0, 0, 40),
-        Position = UDim2.new(0, 0, 0, 50),
-        BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+        Size = UDim2.new(1, 0, 0, 42),
+        Position = UDim2.new(0, 0, 0, 52),
+        BackgroundColor3 = Color3.fromRGB(16, 16, 20),
         BorderSizePixel = 0,
-        ZIndex = 2,
         Parent = mainBG
     })
-    utility.stroke(tabBar, Color3.fromRGB(40, 40, 40), 1)
+    utility.stroke(tabBar, Color3.fromRGB(35, 35, 45), 1, 0.6)
+
     local tabContainer = utility.create("ScrollingFrame", {
-        Size = UDim2.new(1, -20, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
+        Size = UDim2.new(1, -24, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
         BackgroundTransparency = 1,
-        ZIndex = 3,
-        ClipsDescendants = true,
-        Parent = tabBar,
         ScrollBarThickness = 0,
         ScrollingDirection = Enum.ScrollingDirection.X,
         AutomaticCanvasSize = Enum.AutomaticSize.X,
-        CanvasSize = UDim2.new(0, 0, 0, 0)
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        Parent = tabBar
     })
     utility.create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 15),
+        Padding = UDim.new(0, 18),
         VerticalAlignment = Enum.VerticalAlignment.Center,
-        HorizontalAlignment = Enum.HorizontalAlignment.Left,
         Parent = tabContainer
     })
 
-    -- Content frame (two columns)
+    -- Content
     local content = utility.create("Frame", {
-        Size = UDim2.new(1, -20, 1, -100),
-        Position = UDim2.new(0, 10, 0, 95),
+        Size = UDim2.new(1, -24, 1, -106),
+        Position = UDim2.new(0, 12, 0, 100),
         BackgroundTransparency = 1,
-        ZIndex = 2,
         Parent = mainBG
     })
+
     utility.dragify(holder, topBar)
 
     local currentTab = nil
     local windowActions = {}
+
     function windowActions:Tab(tabName)
         local tabBtn = utility.create("TextButton", {
-            Size = UDim2.new(0, 0, 0, 35),
+            Size = UDim2.new(0, 0, 0, 34),
             AutomaticSize = Enum.AutomaticSize.X,
             BackgroundTransparency = 1,
             Text = tabName,
-            TextColor3 = Color3.fromRGB(120, 120, 120),
-            TextSize = 15,
-            Font = Enum.Font.Code,
-            TextXAlignment = Enum.TextXAlignment.Center,
-            ZIndex = 4,
+            TextColor3 = Color3.fromRGB(130, 130, 150),
+            TextSize = 14,
+            Font = Enum.Font.GothamMedium,
             Parent = tabContainer
         })
+
         local underline = utility.create("Frame", {
-            Size = UDim2.new(1, 0, 0, 3),
-            Position = UDim2.new(0, 0, 1, 2),
+            Size = UDim2.new(1, 0, 0, 2),
+            Position = UDim2.new(0, 0, 1, 0),
             BackgroundColor3 = library.accent,
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
-            ZIndex = 4,
             Parent = tabBtn
         })
+        utility.create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = underline})
+
         local tabFrame = utility.create("Frame", {
             Size = UDim2.new(1, 0, 1, 0),
             BackgroundTransparency = 1,
-            BorderSizePixel = 0,
             Visible = false,
-            ZIndex = 2,
             Parent = content
         })
-        -- Two columns for sections
+
         local leftCol = utility.create("ScrollingFrame", {
-            Size = UDim2.new(0.5, -2, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0),
+            Size = UDim2.new(0.5, -6, 1, 0),
             BackgroundTransparency = 1,
-            ScrollBarThickness = 0,
-            ScrollBarImageColor3 = Color3.fromRGB(50, 50, 50),
-            Visible = true,
-            ZIndex = 3,
+            ScrollBarThickness = 3,
+            ScrollBarImageColor3 = Color3.fromRGB(60, 60, 80),
             Parent = tabFrame
         })
-        leftCol.CanvasSize = UDim2.new(0, 0, 0, 1000)
+        leftCol.CanvasSize = UDim2.new(0, 0, 0, 0)
+
         local rightCol = utility.create("ScrollingFrame", {
-            Size = UDim2.new(0.5, -2, 1, 0),
-            Position = UDim2.new(0.5, 2, 0, 0),
+            Size = UDim2.new(0.5, -6, 1, 0),
+            Position = UDim2.new(0.5, 6, 0, 0),
             BackgroundTransparency = 1,
-            ScrollBarThickness = 0,
-            ScrollBarImageColor3 = Color3.fromRGB(50, 50, 50),
-            Visible = true,
-            ZIndex = 3,
+            ScrollBarThickness = 3,
+            ScrollBarImageColor3 = Color3.fromRGB(60, 60, 80),
             Parent = tabFrame
         })
-        rightCol.CanvasSize = UDim2.new(0, 0, 0, 1000)
-        utility.create("UIPadding", {
-            Parent = leftCol,
-            PaddingLeft = UDim.new(0, 2),
-            PaddingRight = UDim.new(0, 2),
-            PaddingTop = UDim.new(0, 10),
-            PaddingBottom = UDim.new(0, 10)
-        })
-        utility.create("UIPadding", {
-            Parent = rightCol,
-            PaddingLeft = UDim.new(0, 2),
-            PaddingRight = UDim.new(0, 2),
-            PaddingTop = UDim.new(0, 10),
-            PaddingBottom = UDim.new(0, 10)
-        })
+        rightCol.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+        for _, col in pairs({leftCol, rightCol}) do
+            utility.create("UIPadding", {
+                Parent = col,
+                PaddingTop = UDim.new(0, 8),
+                PaddingBottom = UDim.new(0, 12),
+                PaddingLeft = UDim.new(0, 2),
+                PaddingRight = UDim.new(0, 2)
+            })
+        end
+
         local leftList = utility.create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Vertical,
-            HorizontalAlignment = Enum.HorizontalAlignment.Left,
+            Padding = UDim.new(0, 12),
             SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 10),
             Parent = leftCol
         })
         local rightList = utility.create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Vertical,
-            HorizontalAlignment = Enum.HorizontalAlignment.Left,
+            Padding = UDim.new(0, 12),
             SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 10),
             Parent = rightCol
         })
+
         local function updateCanvas()
             leftCol.CanvasSize = UDim2.new(0, 0, 0, leftList.AbsoluteContentSize.Y + 20)
             rightCol.CanvasSize = UDim2.new(0, 0, 0, rightList.AbsoluteContentSize.Y + 20)
@@ -484,12 +539,12 @@ function library:Window(name)
         local function select()
             if currentTab then
                 currentTab.Frame.Visible = false
-                utility.tween(currentTab.Btn, {0.2}, {TextColor3 = Color3.fromRGB(120, 120, 120)})
+                utility.tween(currentTab.Btn, {0.2}, {TextColor3 = Color3.fromRGB(130, 130, 150)})
                 utility.tween(currentTab.Line, {0.2}, {BackgroundTransparency = 1})
             end
             tabFrame.Visible = true
-            leftCol.CanvasPosition = Vector2.new(0, 0)
-            rightCol.CanvasPosition = Vector2.new(0, 0)
+            leftCol.CanvasPosition = Vector2.new()
+            rightCol.CanvasPosition = Vector2.new()
             updateCanvas()
             utility.tween(tabBtn, {0.2}, {TextColor3 = library.accent})
             utility.tween(underline, {0.2}, {BackgroundTransparency = 0})
@@ -505,458 +560,449 @@ function library:Window(name)
         if not currentTab then select() end
 
         local tabActions = {}
-        local currentSectionIndex = 0
+        local sectionIndex = 0
+
         function tabActions:Section(sectionName)
-            local targetCol = currentSectionIndex % 2 == 0 and leftCol or rightCol
-            currentSectionIndex = currentSectionIndex + 1
+            local targetCol = sectionIndex % 2 == 0 and leftCol or rightCol
+            sectionIndex += 1
+
             local sectionFrame = utility.create("Frame", {
                 Name = "ZalSection",
-                BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+                BackgroundColor3 = Color3.fromRGB(18, 18, 23),
                 BorderSizePixel = 0,
                 AutomaticSize = Enum.AutomaticSize.Y,
                 Size = UDim2.new(1, 0, 0, 0),
-                ZIndex = 4,
                 Parent = targetCol
             })
-            utility.stroke(sectionFrame, Color3.fromRGB(40, 40, 40), 1)
-            utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = sectionFrame})
+            utility.create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = sectionFrame})
+            utility.stroke(sectionFrame, Color3.fromRGB(40, 40, 50), 1, 0.55)
 
-            -- Collapsible section header
             local headerBtn = utility.create("TextButton", {
-                Size = UDim2.new(1, 0, 0, 30),
+                Size = UDim2.new(1, 0, 0, 34),
                 BackgroundTransparency = 1,
                 Text = "",
-                ZIndex = 5,
                 Parent = sectionFrame
             })
-            local headerText = utility.create("TextLabel", {
-                Size = UDim2.new(1, -30, 1, 0),
-                Position = UDim2.new(0, 10, 0, 0),
+
+            utility.create("TextLabel", {
+                Size = UDim2.new(1, -36, 1, 0),
+                Position = UDim2.new(0, 14, 0, 0),
                 BackgroundTransparency = 1,
                 Text = sectionName:upper(),
                 TextColor3 = library.accent,
-                TextSize = 14,
-                Font = Enum.Font.Code,
+                TextSize = 13,
+                Font = Enum.Font.GothamBold,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                ZIndex = 6,
                 Parent = headerBtn
             })
+
             local arrow = utility.create("TextLabel", {
-                Size = UDim2.new(0, 20, 1, 0),
-                Position = UDim2.new(1, -25, 0, 0),
+                Size = UDim2.new(0, 24, 1, 0),
+                Position = UDim2.new(1, -28, 0, 0),
                 BackgroundTransparency = 1,
-                Text = "▼",
+                Text = "▾",
                 TextColor3 = library.accent,
                 TextSize = 14,
-                Font = Enum.Font.Code,
-                ZIndex = 6,
+                Font = Enum.Font.GothamBold,
                 Parent = headerBtn
             })
+
             local itemsFrame = utility.create("Frame", {
                 Name = "Items",
                 Size = UDim2.new(1, 0, 0, 0),
-                Position = UDim2.new(0, 0, 0, 30),
+                Position = UDim2.new(0, 0, 0, 34),
                 BackgroundTransparency = 1,
                 AutomaticSize = Enum.AutomaticSize.Y,
-                ZIndex = 5,
                 Parent = sectionFrame
             })
-            local itemLayout = utility.create("UIListLayout", {
-                Padding = UDim.new(0, 4),
+            utility.create("UIListLayout", {
+                Padding = UDim.new(0, 6),
                 SortOrder = Enum.SortOrder.LayoutOrder,
                 Parent = itemsFrame
+            })
+            utility.create("UIPadding", {
+                Parent = itemsFrame,
+                PaddingLeft = UDim.new(0, 10),
+                PaddingRight = UDim.new(0, 10),
+                PaddingBottom = UDim.new(0, 10)
             })
 
             local collapsed = false
             headerBtn.MouseButton1Click:Connect(function()
                 collapsed = not collapsed
                 itemsFrame.Visible = not collapsed
-                arrow.Rotation = collapsed and 270 or 0
+                arrow.Rotation = collapsed and -90 or 0
                 updateCanvas()
             end)
 
             local sectionActions = {}
 
-            -- Toggle (unchanged from provided, but tweaked)
-            function sectionActions:Toggle(text, flag, defaultOrCallback, callback)
-                local default = false
-                local cb = nil
-                if typeof(defaultOrCallback) == "boolean" then
-                    default = defaultOrCallback
-                    cb = callback
-                elseif typeof(defaultOrCallback) == "function" then
-                    cb = defaultOrCallback
-                else
-                    cb = callback
-                end
+            -- ===================== TOGGLE =====================
+            function sectionActions:Toggle(text, flag, defaultOrCb, cb)
+                local default = typeof(defaultOrCb) == "boolean" and defaultOrCb or false
+                local callback = typeof(defaultOrCb) == "function" and defaultOrCb or cb
+
                 local enabled = default
+                library.flags[flag] = enabled
+
                 local toggle = utility.create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 30),
+                    Size = UDim2.new(1, 0, 0, 32),
                     BackgroundTransparency = 1,
                     Text = "",
-                    ZIndex = 6,
                     Parent = itemsFrame
                 })
-                local textLabel = utility.create("TextLabel", {
-                    AnchorPoint = Vector2.new(0, 0.5),
-                    Size = UDim2.new(1, -80, 0, 20),
-                    Position = UDim2.new(0, 15, 0.5, 0),
+
+                utility.create("TextLabel", {
+                    Size = UDim2.new(1, -70, 1, 0),
+                    Position = UDim2.new(0, 4, 0, 0),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(180, 180, 180),
+                    TextColor3 = Color3.fromRGB(195, 195, 210),
                     TextSize = 13,
-                    Font = Enum.Font.Code,
+                    Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 7,
                     Parent = toggle
                 })
+
                 local track = utility.create("Frame", {
-                    Size = UDim2.new(0, 36, 0, 18),
-                    Position = UDim2.new(1, -45, 0.5, -9),
-                    BackgroundColor3 = enabled and library.accent or Color3.fromRGB(30, 30, 30),
-                    ZIndex = 7,
+                    Size = UDim2.new(0, 40, 0, 20),
+                    Position = UDim2.new(1, -48, 0.5, -10),
+                    BackgroundColor3 = enabled and library.accent or Color3.fromRGB(35, 35, 45),
                     Parent = toggle
                 })
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 9), Parent = track})
-                utility.stroke(track, Color3.fromRGB(50, 50, 50), 1)
+                utility.create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = track})
+
                 local knob = utility.create("Frame", {
                     Size = UDim2.new(0, 16, 0, 16),
-                    BackgroundColor3 = Color3.new(1, 1, 1),
-                    ZIndex = 8,
+                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
                     Parent = track
                 })
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = knob})
-                local offPos = UDim2.new(0, 1, 0.5, -8)
-                local onPos = UDim2.new(1, -17, 0.5, -8)
-                knob.Position = enabled and onPos or offPos
+                utility.create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = knob})
+                knob.Position = enabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+
                 toggle.MouseButton1Click:Connect(function()
                     enabled = not enabled
-                    local targetPos = enabled and onPos or offPos
-                    local targetColor = enabled and library.accent or Color3.fromRGB(30, 30, 30)
-                    utility.tween(knob, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {Position = targetPos})
-                    utility.tween(track, {0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out}, {BackgroundColor3 = targetColor})
                     library.flags[flag] = enabled
-                    if cb then cb(enabled) end
+                    utility.tween(knob, {0.25, Enum.EasingStyle.Quart}, {
+                        Position = enabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+                    })
+                    utility.tween(track, {0.25}, {
+                        BackgroundColor3 = enabled and library.accent or Color3.fromRGB(35, 35, 45)
+                    })
+                    if callback then callback(enabled) end
                 end)
             end
 
-            -- Textbox
+            -- ===================== TEXTBOX =====================
             function sectionActions:Textbox(text, flag, placeholder, callback)
                 local boxFrame = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 50),
+                    Size = UDim2.new(1, 0, 0, 54),
                     BackgroundTransparency = 1,
-                    ZIndex = 6,
                     Parent = itemsFrame
                 })
+
                 utility.create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 20),
+                    Size = UDim2.new(1, 0, 0, 18),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(180, 180, 180),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
+                    TextColor3 = Color3.fromRGB(190, 190, 205),
+                    TextSize = 13,
+                    Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 7,
                     Parent = boxFrame
                 })
+
                 local box = utility.create("TextBox", {
-                    Size = UDim2.new(1, 0, 0, 24),
+                    Size = UDim2.new(1, 0, 0, 28),
                     Position = UDim2.new(0, 0, 0, 22),
-                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    BackgroundColor3 = Color3.fromRGB(26, 26, 32),
                     BorderSizePixel = 0,
-                    PlaceholderText = placeholder or "...",
                     Text = "",
-                    TextColor3 = Color3.fromRGB(220, 220, 220),
-                    PlaceholderColor3 = Color3.fromRGB(80, 80, 80),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
-                    ZIndex = 7,
+                    PlaceholderText = placeholder or "...",
+                    PlaceholderColor3 = Color3.fromRGB(90, 90, 110),
+                    TextColor3 = Color3.fromRGB(230, 230, 240),
+                    TextSize = 13,
+                    Font = Enum.Font.Gotham,
                     Parent = boxFrame
                 })
-                utility.stroke(box, Color3.fromRGB(50, 50, 50), 1)
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = box})
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 7), Parent = box})
+                utility.stroke(box, Color3.fromRGB(50, 50, 65), 1, 0.5)
+
                 box.FocusLost:Connect(function()
                     library.flags[flag] = box.Text
                     if callback then callback(box.Text) end
                 end)
             end
 
-            -- Dropdown (with search, multi-select)
-            function sectionActions:Dropdown(text, flag, list, multiOrCallback, callback)
-                local multi = false
-                local cb = nil
-                if typeof(multiOrCallback) == "boolean" then
-                    multi = multiOrCallback
-                    cb = callback
-                elseif typeof(multiOrCallback) == "function" then
-                    cb = multiOrCallback
-                end
+            -- ===================== DROPDOWN =====================
+            function sectionActions:Dropdown(text, flag, list, multiOrCb, cb)
+                local multi = typeof(multiOrCb) == "boolean" and multiOrCb or false
+                local callback = typeof(multiOrCb) == "function" and multiOrCb or cb
 
                 local dropdown = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 50),
+                    Size = UDim2.new(1, 0, 0, 54),
                     BackgroundTransparency = 1,
-                    ZIndex = 6,
                     Parent = itemsFrame
                 })
+
                 utility.create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 20),
+                    Size = UDim2.new(1, 0, 0, 18),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(180, 180, 180),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
+                    TextColor3 = Color3.fromRGB(190, 190, 205),
+                    TextSize = 13,
+                    Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 7,
                     Parent = dropdown
                 })
+
                 local btn = utility.create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 24),
+                    Size = UDim2.new(1, 0, 0, 28),
                     Position = UDim2.new(0, 0, 0, 22),
-                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    BackgroundColor3 = Color3.fromRGB(26, 26, 32),
                     BorderSizePixel = 0,
-                    Text = "Select...",
-                    TextColor3 = Color3.fromRGB(200, 200, 200),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
+                    Text = "  Select...",
+                    TextColor3 = Color3.fromRGB(200, 200, 215),
+                    TextSize = 13,
+                    Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 7,
                     Parent = dropdown
                 })
-                utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 7), Parent = btn})
+                utility.stroke(btn, Color3.fromRGB(50, 50, 65), 1, 0.5)
+
                 utility.create("TextLabel", {
-                    Size = UDim2.new(0, 30, 1, 0),
-                    Position = UDim2.new(1, -35, 0, 0),
+                    Size = UDim2.new(0, 28, 1, 0),
+                    Position = UDim2.new(1, -28, 0, 0),
                     BackgroundTransparency = 1,
-                    Text = "▼",
-                    TextColor3 = Color3.fromRGB(120, 120, 120),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
-                    ZIndex = 8,
+                    Text = "▾",
+                    TextColor3 = Color3.fromRGB(140, 140, 160),
+                    TextSize = 13,
+                    Font = Enum.Font.GothamBold,
                     Parent = btn
                 })
-                local maxDropdownHeight = 200
-                local contentHeight = #list * 24
+
                 local listFrame = utility.create("ScrollingFrame", {
-                    Size = UDim2.new(1, 0, 0, contentHeight),
-                    Position = UDim2.new(0, 0, 1, 4),
-                    BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                    Size = UDim2.new(1, 0, 0, 0),
+                    Position = UDim2.new(0, 0, 1, 6),
+                    BackgroundColor3 = Color3.fromRGB(22, 22, 28),
                     BorderSizePixel = 0,
                     Visible = false,
-                    ZIndex = 11,
-                    ScrollBarThickness = 5,
-                    ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60),
-                    CanvasSize = UDim2.new(1, 0, 0, contentHeight),
+                    ZIndex = 20,
+                    ScrollBarThickness = 4,
+                    ScrollBarImageColor3 = Color3.fromRGB(70, 70, 90),
                     Parent = btn
                 })
-                utility.stroke(listFrame, Color3.fromRGB(50, 50, 50), 1)
-                local listLayout = utility.create("UIListLayout", {Padding = UDim.new(0, 2), Parent = listFrame})
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = listFrame})
+                utility.stroke(listFrame, Color3.fromRGB(55, 55, 70), 1, 0.4)
 
-                -- Search bar inside dropdown
+                local listLayout = utility.create("UIListLayout", {
+                    Padding = UDim.new(0, 2),
+                    Parent = listFrame
+                })
+
                 local searchFrame = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 22),
-                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
-                    ZIndex = 12,
+                    Size = UDim2.new(1, 0, 0, 26),
+                    BackgroundColor3 = Color3.fromRGB(28, 28, 36),
                     Parent = listFrame
                 })
                 local searchDropdown = utility.create("TextBox", {
-                    Size = UDim2.new(1, -10, 1, -4),
-                    Position = UDim2.new(0, 5, 0, 2),
+                    Size = UDim2.new(1, -12, 1, -4),
+                    Position = UDim2.new(0, 6, 0, 2),
                     BackgroundTransparency = 1,
                     PlaceholderText = "Filter...",
-                    PlaceholderColor3 = Color3.fromRGB(100, 100, 100),
+                    PlaceholderColor3 = Color3.fromRGB(100, 100, 120),
                     Text = "",
-                    TextColor3 = Color3.fromRGB(220, 220, 220),
+                    TextColor3 = Color3.fromRGB(220, 220, 230),
                     TextSize = 12,
-                    Font = Enum.Font.Code,
+                    Font = Enum.Font.Gotham,
                     ClearTextOnFocus = false,
-                    ZIndex = 13,
                     Parent = searchFrame
                 })
-                listLayout:ApplyLayout() -- ensure initial order; searchFrame first
+
+                local selected = multi and (library.flags[flag] or {}) or {}
+                if multi then library.flags[flag] = selected end
+
+                local function updateButtonText()
+                    if multi then
+                        if #selected == 0 then
+                            btn.Text = "  Select..."
+                        elseif #selected <= 2 then
+                            btn.Text = "  " .. table.concat(selected, ", ")
+                        else
+                            btn.Text = "  " .. #selected .. " selected"
+                        end
+                    else
+                        btn.Text = "  " .. (selected[1] or "Select...")
+                    end
+                end
+                updateButtonText()
+
+                local function refreshItems()
+                    for _, child in ipairs(listFrame:GetChildren()) do
+                        if child ~= searchFrame and not child:IsA("UIListLayout") then
+                            child:Destroy()
+                        end
+                    end
+
+                    local filter = string.lower(searchDropdown.Text)
+                    local count = 0
+
+                    for _, v in ipairs(list) do
+                        if filter == "" or string.find(string.lower(v), filter, 1, true) then
+                            count += 1
+                            local item = utility.create("TextButton", {
+                                Size = UDim2.new(1, 0, 0, 26),
+                                BackgroundColor3 = Color3.fromRGB(22, 22, 28),
+                                BorderSizePixel = 0,
+                                Text = "",
+                                ZIndex = 21,
+                                Parent = listFrame
+                            })
+
+                            local itemText = utility.create("TextLabel", {
+                                Size = UDim2.new(1, -30, 1, 0),
+                                Position = UDim2.new(0, 10, 0, 0),
+                                BackgroundTransparency = 1,
+                                Text = v,
+                                TextColor3 = Color3.fromRGB(180, 180, 195),
+                                TextSize = 13,
+                                Font = Enum.Font.Gotham,
+                                TextXAlignment = Enum.TextXAlignment.Left,
+                                Parent = item
+                            })
+
+                            if multi then
+                                local check = utility.create("TextLabel", {
+                                    Size = UDim2.new(0, 22, 1, 0),
+                                    Position = UDim2.new(1, -26, 0, 0),
+                                    BackgroundTransparency = 1,
+                                    Text = "✓",
+                                    TextColor3 = library.accent,
+                                    TextSize = 14,
+                                    Font = Enum.Font.GothamBold,
+                                    Visible = table.find(selected, v) ~= nil,
+                                    Parent = item
+                                })
+
+                                item.MouseButton1Click:Connect(function()
+                                    local idx = table.find(selected, v)
+                                    if idx then
+                                        table.remove(selected, idx)
+                                        check.Visible = false
+                                    else
+                                        table.insert(selected, v)
+                                        check.Visible = true
+                                    end
+                                    updateButtonText()
+                                    if callback then callback(selected) end
+                                end)
+                            else
+                                item.MouseButton1Click:Connect(function()
+                                    selected = {v}
+                                    library.flags[flag] = v
+                                    updateButtonText()
+                                    listFrame.Visible = false
+                                    listFrame.Size = UDim2.new(1, 0, 0, 0)
+                                    if callback then callback(v) end
+                                end)
+                            end
+                        end
+                    end
+
+                    local height = math.min(26 + count * 28, 180)
+                    listFrame.Size = UDim2.new(1, 0, 0, height)
+                    listFrame.CanvasSize = UDim2.new(0, 0, 0, 26 + count * 28)
+                end
 
                 local opened = false
                 btn.MouseButton1Click:Connect(function()
                     opened = not opened
                     listFrame.Visible = opened
                     if opened then
-                        listFrame.Size = UDim2.new(1, 0, 0, math.min(contentHeight+22, maxDropdownHeight)) -- extra for search
-                        listFrame.CanvasSize = UDim2.new(1, 0, 0, contentHeight+22)
-                        listFrame.CanvasPosition = Vector2.new(0, 0)
                         searchDropdown.Text = ""
-                        updateDropdownItems()
+                        refreshItems()
                     else
                         listFrame.Size = UDim2.new(1, 0, 0, 0)
                     end
                 end)
 
-                local selected = {}
-                if multi then
-                    local existing = library.flags[flag]
-                    if existing and typeof(existing) == "table" then
-                        selected = existing
-                    else
-                        library.flags[flag] = selected
-                    end
-                end
-
-                local function updateButtonText()
-                    if multi then
-                        if #selected == 0 then btn.Text = "Select..." else
-                            btn.Text = #selected <= 3 and table.concat(selected, ", ") or #selected .. " selected"
-                        end
-                    else
-                        btn.Text = selected[1] or "Select..."
-                    end
-                end
-                updateButtonText()
-
-                local function updateDropdownItems()
-                    -- Clear old items except searchFrame
-                    for _, child in ipairs(listFrame:GetChildren()) do
-                        if child ~= searchFrame then child:Destroy() end
-                    end
-                    local filter = string.lower(searchDropdown.Text)
-                    for _, v in ipairs(list) do
-                        if filter == "" or string.find(string.lower(v), filter, 1, true) then
-                            local item = utility.create("TextButton", {
-                                Size = UDim2.new(1, 0, 0, 24),
-                                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-                                BorderSizePixel = 0,
-                                Text = "",
-                                ZIndex = 12,
-                                Parent = listFrame
-                            })
-                            local itemText = utility.create("TextLabel", {
-                                Size = UDim2.new(1, -30, 1, 0),
-                                Position = UDim2.new(0, 5, 0, 0),
-                                BackgroundTransparency = 1,
-                                Text = v,
-                                TextColor3 = Color3.fromRGB(160, 160, 160),
-                                TextSize = 14,
-                                Font = Enum.Font.Code,
-                                TextXAlignment = Enum.TextXAlignment.Left,
-                                ZIndex = 13,
-                                Parent = item
-                            })
-                            if multi then
-                                local check = utility.create("TextLabel", {
-                                    Size = UDim2.new(0, 20, 1, 0),
-                                    Position = UDim2.new(1, -25, 0, 0),
-                                    BackgroundTransparency = 1,
-                                    Text = "✔",
-                                    TextColor3 = library.accent,
-                                    TextSize = 14,
-                                    Font = Enum.Font.Code,
-                                    ZIndex = 13,
-                                    Parent = item
-                                })
-                                check.Visible = table.find(selected, v) ~= nil
-                                item.MouseButton1Click:Connect(function()
-                                    local idx = table.find(selected, v)
-                                    if idx then table.remove(selected, idx); check.Visible = false
-                                    else table.insert(selected, v); check.Visible = true end
-                                    updateButtonText()
-                                    if cb then cb(selected) end
-                                end)
-                            else
-                                item.MouseButton1Click:Connect(function()
-                                    selected = {v}
-                                    btn.Text = v
-                                    opened = false
-                                    listFrame.Visible = false
-                                    listFrame.Size = UDim2.new(1,0,0,0)
-                                    library.flags[flag] = v
-                                    if cb then cb(v) end
-                                end)
-                            end
-                        end
-                    end
-                    -- Resize canvas to fit items + search
-                    local totalHeight = 22 + (listFrame:GetChildren():size() - 1) * 24 -- -1 for searchFrame? careful
-                    listFrame.CanvasSize = UDim2.new(1, 0, 0, math.max(listLayout.AbsoluteContentSize.Y, 22))
-                end
-                searchDropdown:GetPropertyChangedSignal("Text"):Connect(updateDropdownItems)
+                searchDropdown:GetPropertyChangedSignal("Text"):Connect(refreshItems)
             end
 
-            -- Slider (improved: shows percentage, drag & click)
+            -- ===================== SLIDER =====================
             function sectionActions:Slider(text, flag, min, max, default, callback)
                 local slider = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 40),
+                    Size = UDim2.new(1, 0, 0, 48),
                     BackgroundTransparency = 1,
-                    ZIndex = 6,
                     Parent = itemsFrame
                 })
+
                 utility.create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 20),
+                    Size = UDim2.new(1, 0, 0, 18),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(180, 180, 180),
+                    TextColor3 = Color3.fromRGB(190, 190, 205),
                     TextSize = 13,
-                    Font = Enum.Font.Code,
+                    Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 7,
                     Parent = slider
                 })
-                local sliderBar = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 20),
-                    Position = UDim2.new(0, 0, 0, 20),
-                    BackgroundTransparency = 1,
-                    Parent = slider
-                })
+
                 local bg = utility.create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 20),
-                    Position = UDim2.new(0, 0, 0.5, -10),
-                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    Size = UDim2.new(1, 0, 0, 18),
+                    Position = UDim2.new(0, 0, 0, 24),
+                    BackgroundColor3 = Color3.fromRGB(28, 28, 36),
                     Text = "",
-                    ZIndex = 7,
-                    Parent = sliderBar
+                    AutoButtonColor = false,
+                    Parent = slider
                 })
-                utility.stroke(bg, Color3.fromRGB(50, 50, 50), 1)
-                bg.ClipsDescendants = true
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = bg})
+                utility.stroke(bg, Color3.fromRGB(50, 50, 65), 1, 0.5)
+
                 local fill = utility.create("Frame", {
                     Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
                     BackgroundColor3 = library.accent,
                     BorderSizePixel = 0,
-                    ZIndex = 8,
                     Parent = bg
                 })
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = fill})
                 utility.create("UIGradient", {
                     Color = utility.gradient(library.outline),
-                    Rotation = 0,
                     Parent = fill
                 })
+
                 local valLabel = utility.create("TextLabel", {
-                    AnchorPoint = Vector2.new(0.5, 0.5),
                     Size = UDim2.new(1, 0, 1, 0),
-                    Position = UDim2.new(0.5, 0, 0.5, 0),
                     BackgroundTransparency = 1,
-                    Text = string.format("%.2f / %.2f", default, max),
+                    Text = string.format("%.1f", default),
                     TextColor3 = Color3.fromRGB(255, 255, 255),
-                    TextSize = 13,
-                    Font = Enum.Font.Code,
-                    TextXAlignment = Enum.TextXAlignment.Center,
-                    ZIndex = 9,
+                    TextSize = 12,
+                    Font = Enum.Font.GothamBold,
                     Parent = bg
                 })
+
                 local function setValue(frac)
-                    local value = tonumber(string.format("%.2f", min + (max - min) * frac))
-                    utility.tween(fill, {0.1}, {Size = UDim2.new(frac, 0, 1, 0)})
-                    valLabel.Text = string.format("%.2f / %.2f", value, max)
+                    frac = math.clamp(frac, 0, 1)
+                    local value = min + (max - min) * frac
+                    value = math.floor(value * 10 + 0.5) / 10
+                    fill.Size = UDim2.new(frac, 0, 1, 0)
+                    valLabel.Text = string.format("%.1f", value)
                     library.flags[flag] = value
                     if callback then callback(value) end
                 end
+
                 local dragging = false
                 bg.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         dragging = true
-                        local frac = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+                        local frac = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
                         setValue(frac)
                     end
                 end)
                 services.UserInputService.InputChanged:Connect(function(input)
                     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                        local frac = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+                        local frac = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
                         setValue(frac)
                     end
                 end)
@@ -965,204 +1011,394 @@ function library:Window(name)
                         dragging = false
                     end
                 end)
+
+                setValue((default - min) / (max - min))
             end
 
-            -- Button
+            -- ===================== BUTTON =====================
             function sectionActions:Button(text, callback)
                 local btn = utility.create("TextButton", {
                     Size = UDim2.new(1, 0, 0, 34),
-                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    BackgroundColor3 = Color3.fromRGB(28, 28, 36),
                     BorderSizePixel = 0,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(200, 200, 200),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
-                    ZIndex = 6,
+                    TextColor3 = Color3.fromRGB(210, 210, 225),
+                    TextSize = 13,
+                    Font = Enum.Font.GothamMedium,
                     Parent = itemsFrame
                 })
-                utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = btn})
+                utility.stroke(btn, Color3.fromRGB(50, 50, 65), 1, 0.5)
+
+                btn.MouseEnter:Connect(function()
+                    utility.tween(btn, {0.15}, {BackgroundColor3 = Color3.fromRGB(38, 38, 48)})
+                end)
+                btn.MouseLeave:Connect(function()
+                    utility.tween(btn, {0.15}, {BackgroundColor3 = Color3.fromRGB(28, 28, 36)})
+                end)
+
                 btn.MouseButton1Click:Connect(function()
                     if callback then callback() end
                 end)
             end
 
-            -- Color Picker (Linoria-style, basic)
+            -- ===================== PREMIUM COLOR PICKER =====================
             function sectionActions:ColorPicker(text, flag, defaultColor, callback)
+                defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
+                library.flags[flag] = defaultColor
+
+                local h, s, v = RGBToHSV(defaultColor.R * 255, defaultColor.G * 255, defaultColor.B * 255)
+
                 local picker = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 50),
+                    Size = UDim2.new(1, 0, 0, 54),
                     BackgroundTransparency = 1,
-                    ZIndex = 6,
                     Parent = itemsFrame
                 })
+
                 utility.create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 20),
+                    Size = UDim2.new(1, 0, 0, 18),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(180, 180, 180),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
+                    TextColor3 = Color3.fromRGB(190, 190, 205),
+                    TextSize = 13,
+                    Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 7,
                     Parent = picker
                 })
+
                 local colorBtn = utility.create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 24),
+                    Size = UDim2.new(1, 0, 0, 28),
                     Position = UDim2.new(0, 0, 0, 22),
-                    BackgroundColor3 = defaultColor or Color3.fromRGB(255,255,255),
+                    BackgroundColor3 = defaultColor,
                     BorderSizePixel = 0,
                     Text = "",
-                    ZIndex = 7,
                     Parent = picker
                 })
-                utility.stroke(colorBtn, Color3.fromRGB(50, 50, 50), 1)
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = colorBtn})
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 7), Parent = colorBtn})
+                utility.stroke(colorBtn, Color3.fromRGB(60, 60, 75), 1, 0.4)
+
+                local open = false
+                local pickerFrame = nil
+
                 colorBtn.MouseButton1Click:Connect(function()
-                    -- Simple color input via RGB textboxes (could expand with actual color wheel)
-                    local input = utility.create("Frame", {
-                        Size = UDim2.new(0, 180, 0, 60),
-                        Position = UDim2.new(0.5, -90, 1, 5),
-                        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                    if open and pickerFrame then
+                        pickerFrame:Destroy()
+                        open = false
+                        return
+                    end
+                    open = true
+
+                    pickerFrame = utility.create("Frame", {
+                        Size = UDim2.new(0, 220, 0, 280),
+                        Position = UDim2.new(0, 0, 1, 8),
+                        BackgroundColor3 = Color3.fromRGB(20, 20, 26),
                         BorderSizePixel = 0,
-                        ZIndex = 12,
+                        ZIndex = 50,
                         Parent = picker
                     })
-                    utility.stroke(input, library.accent, 1)
-                    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = input})
-                    local rBox = utility.create("TextBox", {
-                        Size = UDim2.new(0.3, -4, 1, -4),
-                        Position = UDim2.new(0, 2, 0, 2),
-                        BackgroundColor3 = Color3.fromRGB(30,30,30),
-                        Text = tostring(math.floor(defaultColor.R*255)),
-                        TextColor3 = Color3.fromRGB(255,100,100),
-                        TextSize = 14,
-                        Font = Enum.Font.Code,
-                        ZIndex = 13,
-                        Parent = input
-                    })
-                    local gBox = utility.create("TextBox", {
-                        Size = UDim2.new(0.3, -4, 1, -4),
-                        Position = UDim2.new(0.33, 2, 0, 2),
-                        BackgroundColor3 = Color3.fromRGB(30,30,30),
-                        Text = tostring(math.floor(defaultColor.G*255)),
-                        TextColor3 = Color3.fromRGB(100,255,100),
-                        TextSize = 14,
-                        Font = Enum.Font.Code,
-                        ZIndex = 13,
-                        Parent = input
-                    })
-                    local bBox = utility.create("TextBox", {
-                        Size = UDim2.new(0.3, -4, 1, -4),
-                        Position = UDim2.new(0.66, 2, 0, 2),
-                        BackgroundColor3 = Color3.fromRGB(30,30,30),
-                        Text = tostring(math.floor(defaultColor.B*255)),
-                        TextColor3 = Color3.fromRGB(100,100,255),
-                        TextSize = 14,
-                        Font = Enum.Font.Code,
-                        ZIndex = 13,
-                        Parent = input
-                    })
-                    local confirm = utility.create("TextButton", {
-                        Size = UDim2.new(1, 0, 0, 20),
-                        Position = UDim2.new(0, 0, 1, 2),
-                        BackgroundColor3 = library.accent,
+                    utility.create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = pickerFrame})
+                    utility.stroke(pickerFrame, library.accent, 1.2, 0.3)
+
+                    -- SV Square
+                    local svFrame = utility.create("Frame", {
+                        Size = UDim2.new(0, 180, 0, 140),
+                        Position = UDim2.new(0, 12, 0, 12),
+                        BackgroundColor3 = Color3.fromRGB(255, 0, 0),
                         BorderSizePixel = 0,
-                        Text = "Apply",
-                        TextColor3 = Color3.new(1,1,1),
-                        TextSize = 12,
-                        Font = Enum.Font.Code,
-                        ZIndex = 13,
-                        Parent = input
+                        ZIndex = 51,
+                        Parent = pickerFrame
                     })
-                    confirm.MouseButton1Click:Connect(function()
-                        local r = math.clamp(tonumber(rBox.Text) or 255,0,255)/255
-                        local g = math.clamp(tonumber(gBox.Text) or 255,0,255)/255
-                        local b = math.clamp(tonumber(bBox.Text) or 255,0,255)/255
-                        local newColor = Color3.fromRGB(r*255,g*255,b*255)
+                    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = svFrame})
+
+                    local satGradient = utility.create("UIGradient", {
+                        Color = ColorSequence.new({
+                            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+                        }),
+                        Parent = svFrame
+                    })
+
+                    local valOverlay = utility.create("Frame", {
+                        Size = UDim2.new(1, 0, 1, 0),
+                        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+                        BorderSizePixel = 0,
+                        ZIndex = 52,
+                        Parent = svFrame
+                    })
+                    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = valOverlay})
+                    utility.create("UIGradient", {
+                        Rotation = 90,
+                        Color = ColorSequence.new({
+                            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+                        }),
+                        Transparency = NumberSequence.new({
+                            NumberSequenceKeypoint.new(0, 1),
+                            NumberSequenceKeypoint.new(1, 0)
+                        }),
+                        Parent = valOverlay
+                    })
+
+                    local svCursor = utility.create("Frame", {
+                        Size = UDim2.new(0, 12, 0, 12),
+                        AnchorPoint = Vector2.new(0.5, 0.5),
+                        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                        BorderSizePixel = 0,
+                        ZIndex = 53,
+                        Parent = svFrame
+                    })
+                    utility.create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = svCursor})
+                    utility.stroke(svCursor, Color3.fromRGB(0, 0, 0), 1.5, 0)
+
+                    -- Hue Bar
+                    local hueFrame = utility.create("Frame", {
+                        Size = UDim2.new(0, 180, 0, 16),
+                        Position = UDim2.new(0, 12, 0, 162),
+                        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                        BorderSizePixel = 0,
+                        ZIndex = 51,
+                        Parent = pickerFrame
+                    })
+                    utility.create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = hueFrame})
+                    utility.create("UIGradient", {
+                        Color = ColorSequence.new({
+                            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                            ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                            ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                            ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                            ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+                        }),
+                        Parent = hueFrame
+                    })
+
+                    local hueCursor = utility.create("Frame", {
+                        Size = UDim2.new(0, 6, 1, 4),
+                        Position = UDim2.new(h, -3, 0, -2),
+                        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                        BorderSizePixel = 0,
+                        ZIndex = 52,
+                        Parent = hueFrame
+                    })
+                    utility.create("UICorner", {CornerRadius = UDim.new(0, 3), Parent = hueCursor})
+                    utility.stroke(hueCursor, Color3.fromRGB(0, 0, 0), 1, 0)
+
+                    -- Preview + Hex
+                    local preview = utility.create("Frame", {
+                        Size = UDim2.new(0, 40, 0, 28),
+                        Position = UDim2.new(0, 12, 0, 190),
+                        BackgroundColor3 = defaultColor,
+                        BorderSizePixel = 0,
+                        ZIndex = 51,
+                        Parent = pickerFrame
+                    })
+                    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = preview})
+
+                    local hexBox = utility.create("TextBox", {
+                        Size = UDim2.new(0, 130, 0, 28),
+                        Position = UDim2.new(0, 60, 0, 190),
+                        BackgroundColor3 = Color3.fromRGB(30, 30, 38),
+                        BorderSizePixel = 0,
+                        Text = Color3ToHex(defaultColor),
+                        TextColor3 = Color3.fromRGB(230, 230, 240),
+                        TextSize = 13,
+                        Font = Enum.Font.Gotham,
+                        Parent = pickerFrame
+                    })
+                    utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = hexBox})
+
+                    -- RGB Inputs
+                    local function makeRGBBox(posX, label, value)
+                        local box = utility.create("TextBox", {
+                            Size = UDim2.new(0, 54, 0, 26),
+                            Position = UDim2.new(0, posX, 0, 230),
+                            BackgroundColor3 = Color3.fromRGB(30, 30, 38),
+                            BorderSizePixel = 0,
+                            Text = tostring(value),
+                            TextColor3 = Color3.fromRGB(230, 230, 240),
+                            TextSize = 12,
+                            Font = Enum.Font.Gotham,
+                            Parent = pickerFrame
+                        })
+                        utility.create("UICorner", {CornerRadius = UDim.new(0, 5), Parent = box})
+                        return box
+                    end
+
+                    local rBox = makeRGBBox(12, "R", math.floor(defaultColor.R * 255))
+                    local gBox = makeRGBBox(74, "G", math.floor(defaultColor.G * 255))
+                    local bBox = makeRGBBox(136, "B", math.floor(defaultColor.B * 255))
+
+                    local function updateColor(newH, newS, newV, fromInput)
+                        h, s, v = newH or h, newS or s, newV or v
+                        local r, g, b = HSVToRGB(h, s, v)
+                        local newColor = Color3.fromRGB(r, g, b)
+
                         colorBtn.BackgroundColor3 = newColor
+                        preview.BackgroundColor3 = newColor
                         library.flags[flag] = newColor
+
+                        -- Update SV gradient base color
+                        local pureR, pureG, pureB = HSVToRGB(h, 1, 1)
+                        satGradient.Color = ColorSequence.new({
+                            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                            ColorSequenceKeypoint.new(1, Color3.fromRGB(pureR, pureG, pureB))
+                        })
+
+                        svCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+                        hueCursor.Position = UDim2.new(h, -3, 0, -2)
+
+                        if not fromInput then
+                            hexBox.Text = Color3ToHex(newColor)
+                            rBox.Text = tostring(r)
+                            gBox.Text = tostring(g)
+                            bBox.Text = tostring(b)
+                        end
+
                         if callback then callback(newColor) end
-                        input:Destroy()
-                    end)
-                    -- Close on click outside
-                    local conn
-                    conn = services.UserInputService.InputBegan:Connect(function(inp)
-                        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                            local pos = services.UserInputService:GetMouseLocation()
-                            if input.AbsolutePosition.X > pos.X or pos.X > input.AbsolutePosition.X + input.AbsoluteSize.X
-                            or input.AbsolutePosition.Y > pos.Y or pos.Y > input.AbsolutePosition.Y + input.AbsoluteSize.Y then
-                                input:Destroy()
-                                conn:Disconnect()
-                            end
+                    end
+
+                    -- SV interaction
+                    local svDragging = false
+                    svFrame.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                            svDragging = true
+                            local rel = input.Position - svFrame.AbsolutePosition
+                            local newS = math.clamp(rel.X / svFrame.AbsoluteSize.X, 0, 1)
+                            local newV = 1 - math.clamp(rel.Y / svFrame.AbsoluteSize.Y, 0, 1)
+                            updateColor(nil, newS, newV)
                         end
                     end)
+                    services.UserInputService.InputChanged:Connect(function(input)
+                        if svDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                            local rel = input.Position - svFrame.AbsolutePosition
+                            local newS = math.clamp(rel.X / svFrame.AbsoluteSize.X, 0, 1)
+                            local newV = 1 - math.clamp(rel.Y / svFrame.AbsoluteSize.Y, 0, 1)
+                            updateColor(nil, newS, newV)
+                        end
+                    end)
+                    services.UserInputService.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                            svDragging = false
+                        end
+                    end)
+
+                    -- Hue interaction
+                    local hueDragging = false
+                    hueFrame.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                            hueDragging = true
+                            local rel = (input.Position.X - hueFrame.AbsolutePosition.X) / hueFrame.AbsoluteSize.X
+                            updateColor(math.clamp(rel, 0, 1), nil, nil)
+                        end
+                    end)
+                    services.UserInputService.InputChanged:Connect(function(input)
+                        if hueDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                            local rel = (input.Position.X - hueFrame.AbsolutePosition.X) / hueFrame.AbsoluteSize.X
+                            updateColor(math.clamp(rel, 0, 1), nil, nil)
+                        end
+                    end)
+                    services.UserInputService.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                            hueDragging = false
+                        end
+                    end)
+
+                    -- Hex + RGB inputs
+                    hexBox.FocusLost:Connect(function()
+                        local hex = hexBox.Text:gsub("#", "")
+                        if #hex == 6 then
+                            local r = tonumber(hex:sub(1, 2), 16) or 255
+                            local g = tonumber(hex:sub(3, 4), 16) or 255
+                            local b = tonumber(hex:sub(5, 6), 16) or 255
+                            local nh, ns, nv = RGBToHSV(r, g, b)
+                            updateColor(nh, ns, nv, true)
+                        end
+                    end)
+
+                    local function rgbChanged()
+                        local r = math.clamp(tonumber(rBox.Text) or 0, 0, 255)
+                        local g = math.clamp(tonumber(gBox.Text) or 0, 0, 255)
+                        local b = math.clamp(tonumber(bBox.Text) or 0, 0, 255)
+                        local nh, ns, nv = RGBToHSV(r, g, b)
+                        updateColor(nh, ns, nv, true)
+                    end
+                    rBox.FocusLost:Connect(rgbChanged)
+                    gBox.FocusLost:Connect(rgbChanged)
+                    bBox.FocusLost:Connect(rgbChanged)
+
+                    -- Initial cursor positions
+                    updateColor(h, s, v, true)
                 end)
             end
 
-            -- Keybind picker
+            -- ===================== KEYBIND =====================
             function sectionActions:Keybind(text, flag, defaultKey, callback)
                 local keybind = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 50),
+                    Size = UDim2.new(1, 0, 0, 54),
                     BackgroundTransparency = 1,
-                    ZIndex = 6,
                     Parent = itemsFrame
                 })
+
                 utility.create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 20),
+                    Size = UDim2.new(1, 0, 0, 18),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(180, 180, 180),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
+                    TextColor3 = Color3.fromRGB(190, 190, 205),
+                    TextSize = 13,
+                    Font = Enum.Font.Gotham,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 7,
                     Parent = keybind
                 })
+
                 local btn = utility.create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 24),
+                    Size = UDim2.new(1, 0, 0, 28),
                     Position = UDim2.new(0, 0, 0, 22),
-                    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+                    BackgroundColor3 = Color3.fromRGB(26, 26, 32),
                     BorderSizePixel = 0,
                     Text = defaultKey and defaultKey.Name or "None",
-                    TextColor3 = Color3.fromRGB(200, 200, 200),
-                    TextSize = 14,
-                    Font = Enum.Font.Code,
-                    ZIndex = 7,
+                    TextColor3 = Color3.fromRGB(200, 200, 215),
+                    TextSize = 13,
+                    Font = Enum.Font.Gotham,
                     Parent = keybind
                 })
-                utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
-                utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+                utility.create("UICorner", {CornerRadius = UDim.new(0, 7), Parent = btn})
+                utility.stroke(btn, Color3.fromRGB(50, 50, 65), 1, 0.5)
+
+                if defaultKey then
+                    library.flags[flag] = defaultKey
+                end
+
                 local listening = false
                 btn.MouseButton1Click:Connect(function()
+                    if listening then return end
                     listening = true
                     btn.Text = "..."
                     local conn
-                    conn = services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                        if listening and not gameProcessed then
-                            if input.KeyCode ~= Enum.KeyCode.Unknown then
-                                local key = input.KeyCode
-                                btn.Text = key.Name
-                                library.flags[flag] = key
-                                if callback then callback(key) end
-                                listening = false
-                                conn:Disconnect()
-                            end
+                    conn = services.UserInputService.InputBegan:Connect(function(input, gp)
+                        if listening and not gp and input.KeyCode ~= Enum.KeyCode.Unknown then
+                            local key = input.KeyCode
+                            btn.Text = key.Name
+                            library.flags[flag] = key
+                            if callback then callback(key) end
+                            listening = false
+                            conn:Disconnect()
                         end
                     end)
                 end)
             end
 
-            -- Label (just display text)
+            -- ===================== LABEL =====================
             function sectionActions:Label(text)
                 utility.create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 24),
+                    Size = UDim2.new(1, 0, 0, 22),
                     BackgroundTransparency = 1,
                     Text = text,
-                    TextColor3 = Color3.fromRGB(150, 150, 150),
-                    TextSize = 13,
-                    Font = Enum.Font.Code,
+                    TextColor3 = Color3.fromRGB(150, 150, 170),
+                    TextSize = 12,
+                    Font = Enum.Font.Gotham,
                     TextWrapped = true,
-                    ZIndex = 6,
+                    TextXAlignment = Enum.TextXAlignment.Left,
                     Parent = itemsFrame
                 })
             end
@@ -1172,37 +1408,30 @@ function library:Window(name)
         return tabActions
     end
 
-    -- Global search: filter items within sections, not just sections
+    -- Global Search
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(searchBox.Text)
-        if currentTab and currentTab.Frame then
-            local cols = {currentTab.LeftCol, currentTab.RightCol}
-            for _, col in ipairs(cols) do
-                for _, section in ipairs(col:GetChildren()) do
-                    if section.Name == "ZalSection" then
-                        local items = section:FindFirstChild("Items")
-                        if items then
-                            local anyVisible = false
-                            for _, child in ipairs(items:GetChildren()) do
-                                if child:IsA("GuiObject") then
-                                    local txt = child:FindFirstChildWhichIsA("TextLabel") or child:FindFirstChildWhichIsA("TextButton")
-                                    local match = (query == "") or (txt and string.find(string.lower(txt.Text), query, 1, true))
-                                    child.Visible = match
-                                    if match then anyVisible = true end
-                                end
-                            end
-                            -- Hide section if no items visible
-                            section.Visible = (query == "") or anyVisible
-                            if section.Visible then
-                                -- Also show header if section collapsed? keep as is
+        if not currentTab then return end
+
+        for _, col in ipairs({currentTab.LeftCol, currentTab.RightCol}) do
+            for _, section in ipairs(col:GetChildren()) do
+                if section.Name == "ZalSection" then
+                    local items = section:FindFirstChild("Items")
+                    if items then
+                        local anyVisible = false
+                        for _, child in ipairs(items:GetChildren()) do
+                            if child:IsA("GuiObject") and not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+                                local txt = child:FindFirstChildWhichIsA("TextLabel") or child:FindFirstChildWhichIsA("TextButton")
+                                local match = query == "" or (txt and string.find(string.lower(txt.Text or ""), query, 1, true))
+                                child.Visible = match
+                                if match then anyVisible = true end
                             end
                         end
+                        section.Visible = query == "" or anyVisible
                     end
                 end
-                col.CanvasPosition = Vector2.new(0, 0)
             end
-            task.wait(0.05)
-            updateCanvas()
+            col.CanvasPosition = Vector2.new()
         end
     end)
 
