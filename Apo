@@ -1,5 +1,4 @@
-repeat
-    wait()
+wait()
 until game:IsLoaded()
 
 local library = {
@@ -8,6 +7,9 @@ local library = {
     accent = Color3.fromRGB(117, 52, 235),
     outline = { Color3.fromRGB(117, 52, 235), Color3.fromRGB(200, 100, 255) },
     toggled = true,
+    -- For stats update
+    fpsLabel = nil,
+    pingLabel = nil,
 }
 
 local services = setmetatable({}, {
@@ -168,6 +170,9 @@ function library:Notify(options)
     end)
 end
 
+-- ---------------------------------------------------------------------
+-- MAIN WINDOW
+-- ---------------------------------------------------------------------
 function library:Window(name)
     local gui = utility.create("ScreenGui", {
         Name = "ZalHub",
@@ -187,6 +192,7 @@ function library:Window(name)
         CornerRadius = UDim.new(0, 8),
         Parent = holder
     })
+
     -- TOGGLE GUI / WATERMARK
     local toggleGui = Instance.new("ScreenGui")
     toggleGui.Name = "ZalHub_Toggle"
@@ -234,6 +240,8 @@ function library:Window(name)
         end
     end)
     utility.dragify(toggleBtn, toggleBtn)
+
+    -- Main background
     local mainBG = utility.create("Frame", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = Color3.fromRGB(15, 15, 15),
@@ -245,6 +253,8 @@ function library:Window(name)
         CornerRadius = UDim.new(0, 8),
         Parent = mainBG
     })
+
+    -- TOP BAR
     local topBar = utility.create("Frame", {
         Size = UDim2.new(1, 0, 0, 50),
         BackgroundColor3 = Color3.fromRGB(20, 20, 20),
@@ -270,36 +280,8 @@ function library:Window(name)
         ZIndex = 3,
         Parent = topBar
     })
-    local tabBar = utility.create("Frame", {
-        Size = UDim2.new(1, 0, 0, 40),
-        Position = UDim2.new(0, 0, 0, 50),
-        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-        BorderSizePixel = 0,
-        ZIndex = 2,
-        Parent = mainBG
-    })
-    utility.stroke(tabBar, Color3.fromRGB(40, 40, 40), 1)
-    local tabContainer = utility.create("ScrollingFrame", {
-        Size = UDim2.new(1, 0, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        BackgroundTransparency = 1,
-        ZIndex = 3,
-        ClipsDescendants = true,
-        Parent = tabBar,
-        ScrollBarThickness = 0,
-        ScrollingDirection = Enum.ScrollingDirection.X,
-        AutomaticCanvasSize = Enum.AutomaticSize.X,
-        CanvasSize = UDim2.new(0, 0, 0, 0)
-    })
-    utility.create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 15),
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        HorizontalAlignment = Enum.HorizontalAlignment.Left,
-        Parent = tabContainer
-    })
-    -- === GLOBAL SEARCH BAR ===
+
+    -- GLOBAL SEARCH BAR
     local searchContainer = utility.create("Frame", {
         Name = "GlobalSearch",
         Size = UDim2.new(0, 220, 0, 32),
@@ -336,16 +318,91 @@ function library:Window(name)
         ZIndex = 6,
         Parent = searchContainer
     })
+
+    -- TAB BAR
+    local tabBar = utility.create("Frame", {
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 0, 50),
+        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = mainBG
+    })
+    utility.stroke(tabBar, Color3.fromRGB(40, 40, 40), 1)
+    local tabContainer = utility.create("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        ZIndex = 3,
+        ClipsDescendants = true,
+        Parent = tabBar,
+        ScrollBarThickness = 0,
+        ScrollingDirection = Enum.ScrollingDirection.X,
+        AutomaticCanvasSize = Enum.AutomaticSize.X,
+        CanvasSize = UDim2.new(0, 0, 0, 0)
+    })
+    utility.create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 15),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+        Parent = tabContainer
+    })
+
+    -- CONTENT AREA (adjusted to leave room for footer)
     local content = utility.create("Frame", {
-        Size = UDim2.new(1, -20, 1, -100),
+        Size = UDim2.new(1, -20, 1, -130),
         Position = UDim2.new(0, 10, 0, 95),
         BackgroundTransparency = 1,
         ZIndex = 2,
         Parent = mainBG
     })
+
+    -- FOOTER (watermark + stats)
+    local footer = utility.create("Frame", {
+        Size = UDim2.new(1, 0, 0, 30),
+        Position = UDim2.new(0, 0, 1, -30),
+        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = mainBG
+    })
+    utility.stroke(footer, Color3.fromRGB(40, 40, 40), 1)
+
+    local watermark = utility.create("TextLabel", {
+        Size = UDim2.new(0.6, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "ZalHub Gold Farm v2.5.0 Premium  •  Always Up To Date  •  Save Configuration",
+        TextColor3 = Color3.fromRGB(120, 120, 120),
+        TextSize = 12,
+        Font = Enum.Font.Code,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 3,
+        Parent = footer
+    })
+    local stats = utility.create("TextLabel", {
+        Size = UDim2.new(0.4, 0, 1, 0),
+        Position = UDim2.new(0.6, 0, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "FPS: 240  PING: 32ms",
+        TextColor3 = Color3.fromRGB(120, 120, 120),
+        TextSize = 12,
+        Font = Enum.Font.Code,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        ZIndex = 3,
+        Parent = footer
+    })
+    -- store references for updating
+    library.fpsLabel = stats
+    library.pingLabel = stats  -- we'll update the whole text, or we can separate. Simpler: use whole text.
+
     utility.dragify(holder, topBar)
+
+    -- Tab management
     local currentTab = nil
     local windowActions = {}
+
     function windowActions:Tab(tabName)
         local tabBtn = utility.create("TextButton", {
             Size = UDim2.new(0, 0, 0, 35),
@@ -368,6 +425,7 @@ function library:Window(name)
             ZIndex = 4,
             Parent = tabBtn
         })
+
         local tabFrame = utility.create("Frame", {
             Size = UDim2.new(1, 0, 1, 0),
             BackgroundTransparency = 1,
@@ -376,6 +434,7 @@ function library:Window(name)
             ZIndex = 2,
             Parent = content
         })
+
         local leftCol = utility.create("ScrollingFrame", {
             Size = UDim2.new(0.5, -2, 1, 0),
             Position = UDim2.new(0, 0, 0, 0),
@@ -398,6 +457,7 @@ function library:Window(name)
             Parent = tabFrame
         })
         rightCol.CanvasSize = UDim2.new(0, 0, 0, 1000)
+
         utility.create("UIPadding", {
             Parent = leftCol,
             PaddingLeft = UDim.new(0, 1),
@@ -412,6 +472,7 @@ function library:Window(name)
             PaddingTop = UDim.new(0, 10),
             PaddingBottom = UDim.new(0, 10)
         })
+
         local leftList = utility.create("UIListLayout", {
             FillDirection = Enum.FillDirection.Vertical,
             HorizontalAlignment = Enum.HorizontalAlignment.Left,
@@ -426,12 +487,14 @@ function library:Window(name)
             Padding = UDim.new(0, 10),
             Parent = rightCol
         })
+
         local function updateCanvas()
             leftCol.CanvasSize = UDim2.new(0, 0, 0, leftList.AbsoluteContentSize.Y + 20)
             rightCol.CanvasSize = UDim2.new(0, 0, 0, rightList.AbsoluteContentSize.Y + 20)
         end
         leftList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
         rightList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+
         local function select()
             if currentTab then
                 currentTab.Frame.Visible = false
@@ -446,7 +509,6 @@ function library:Window(name)
             updateCanvas()
             utility.tween(tabBtn, {0.2}, {TextColor3 = library.accent})
             utility.tween(underline, {0.2}, {BackgroundTransparency = 0})
-           
             currentTab = {
                 Frame = tabFrame,
                 Btn = tabBtn,
@@ -455,13 +517,47 @@ function library:Window(name)
                 RightCol = rightCol
             }
         end
+
         tabBtn.MouseButton1Click:Connect(select)
         if not currentTab then select() end
+
+        -- Global search filtering
+        searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local query = string.lower(searchBox.Text)
+            if currentTab and currentTab.LeftCol and currentTab.RightCol then
+                local cols = {currentTab.LeftCol, currentTab.RightCol}
+                for _, col in ipairs(cols) do
+                    for _, child in ipairs(col:GetChildren()) do
+                        if child.Name == "ZalSection" then
+                            local title = child:FindFirstChildWhichIsA("TextLabel")
+                            if title then
+                                local match = (query == "") or string.find(string.lower(title.Text), query, 1, true)
+                                child.Visible = match
+                            end
+                        end
+                    end
+                    col.CanvasPosition = Vector2.new(0, 0)
+                end
+                task.delay(0.05, function()
+                    if currentTab.LeftCol then
+                        local ll = currentTab.LeftCol:FindFirstChild("UIListLayout")
+                        if ll then currentTab.LeftCol.CanvasSize = UDim2.new(0, 0, 0, ll.AbsoluteContentSize.Y + 20) end
+                    end
+                    if currentTab.RightCol then
+                        local rl = currentTab.RightCol:FindFirstChild("UIListLayout")
+                        if rl then currentTab.RightCol.CanvasSize = UDim2.new(0, 0, 0, rl.AbsoluteContentSize.Y + 20) end
+                    end
+                end)
+            end
+        end)
+
         local tabActions = {}
         local currentSectionIndex = 0
+
         function tabActions:Section(sectionName)
             local targetCol = currentSectionIndex % 2 == 0 and leftCol or rightCol
             currentSectionIndex = currentSectionIndex + 1
+
             local sectionFrame = utility.create("Frame", {
                 Name = "ZalSection",
                 BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -476,6 +572,7 @@ function library:Window(name)
                 CornerRadius = UDim.new(0, 8),
                 Parent = sectionFrame
             })
+
             utility.create("TextLabel", {
                 Size = UDim2.new(1, -2, 0, 25),
                 Position = UDim2.new(0, 1, 0, 0),
@@ -488,6 +585,7 @@ function library:Window(name)
                 ZIndex = 5,
                 Parent = sectionFrame
             })
+
             local items = utility.create("Frame", {
                 Size = UDim2.new(1, -2, 0, 0),
                 Position = UDim2.new(0, 1, 0, 25),
@@ -501,8 +599,12 @@ function library:Window(name)
                 SortOrder = Enum.SortOrder.LayoutOrder,
                 Parent = items
             })
+
             local sectionActions = {}
-            -- MODIFIED TOGGLE (smaller, matches pic)
+
+            -- -------------------------------------------------------------
+            -- TOGGLE (small, matches screenshot)
+            -- -------------------------------------------------------------
             function sectionActions:Toggle(text, flag, defaultOrCallback, callback)
                 local default = false
                 local cb = nil
@@ -555,6 +657,7 @@ function library:Window(name)
                 local offPos = UDim2.new(0, padding, 0.5, -8)
                 local onPos = UDim2.new(1, -(16 + padding), 0.5, -8)
                 knob.Position = enabled and onPos or offPos
+
                 toggle.MouseButton1Click:Connect(function()
                     enabled = not enabled
                     local targetPos = enabled and onPos or offPos
@@ -566,7 +669,13 @@ function library:Window(name)
                         cb(enabled)
                     end
                 end)
+                -- set initial flag
+                library.flags[flag] = enabled
             end
+
+            -- -------------------------------------------------------------
+            -- TEXTBOX
+            -- -------------------------------------------------------------
             function sectionActions:Textbox(text, flag, placeholder, callback)
                 local textboxFrame = utility.create("Frame", {
                     Size = UDim2.new(1, 0, 0, 50),
@@ -608,10 +717,10 @@ function library:Window(name)
                     end
                 end)
             end
-            -- UPDATED DROPDOWN: now supports multi-selection!
-            -- Usage:
-            -- :Dropdown("Text", "flag", list, callback)          → single select (original behavior)
-            -- :Dropdown("Text", "flag", list, true, callback)   → multi-select
+
+            -- -------------------------------------------------------------
+            -- DROPDOWN (supports single or multi select)
+            -- -------------------------------------------------------------
             function sectionActions:Dropdown(text, flag, list, callbackOrMulti, callback)
                 local multi = false
                 local cb = nil
@@ -654,7 +763,7 @@ function library:Window(name)
                 })
                 utility.stroke(btn, Color3.fromRGB(50, 50, 50), 1)
                 utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
-                -- Arrow indicator
+                -- Arrow
                 utility.create("TextLabel", {
                     Size = UDim2.new(0, 30, 1, 0),
                     Position = UDim2.new(1, -35, 0, 0),
@@ -666,6 +775,7 @@ function library:Window(name)
                     ZIndex = 8,
                     Parent = btn
                 })
+
                 local maxDropdownHeight = 200
                 local contentHeight = #list * 24
                 local listFrame = utility.create("ScrollingFrame", {
@@ -686,6 +796,7 @@ function library:Window(name)
                     Padding = UDim.new(0, 2),
                     Parent = listFrame
                 })
+
                 local opened = false
                 btn.MouseButton1Click:Connect(function()
                     opened = not opened
@@ -700,7 +811,7 @@ function library:Window(name)
                 end)
 
                 if not multi then
-                    -- SINGLE SELECT (original behavior)
+                    -- SINGLE SELECT
                     for _, v in next, list do
                         local item = utility.create("TextButton", {
                             Size = UDim2.new(1, 0, 0, 24),
@@ -725,7 +836,7 @@ function library:Window(name)
                         end)
                     end
                 else
-                    -- MULTI SELECT (new!)
+                    -- MULTI SELECT
                     local selected = library.flags[flag]
                     if not selected or typeof(selected) ~= "table" then
                         selected = {}
@@ -757,7 +868,6 @@ function library:Window(name)
                             ZIndex = 12,
                             Parent = listFrame
                         })
-
                         local itemText = utility.create("TextLabel", {
                             Size = UDim2.new(1, -30, 1, 0),
                             Position = UDim2.new(0, 5, 0, 0),
@@ -770,7 +880,6 @@ function library:Window(name)
                             ZIndex = 13,
                             Parent = item
                         })
-
                         local check = utility.create("TextLabel", {
                             Size = UDim2.new(0, 20, 1, 0),
                             Position = UDim2.new(1, -25, 0, 0),
@@ -779,7 +888,6 @@ function library:Window(name)
                             TextColor3 = library.accent,
                             TextSize = 14,
                             Font = Enum.Font.Code,
-                            TextXAlignment = Enum.TextXAlignment.Center,
                             ZIndex = 13,
                             Parent = item
                         })
@@ -802,7 +910,10 @@ function library:Window(name)
                     end
                 end
             end
-            -- MODIFIED SLIDER (thinner bar, value as current/max, matches pic)
+
+            -- -------------------------------------------------------------
+            -- SLIDER (shows current / max, thin bar)
+            -- -------------------------------------------------------------
             function sectionActions:Slider(text, flag, min, max, default, callback)
                 local slider = utility.create("Frame", {
                     Size = UDim2.new(1, 0, 0, 40),
@@ -862,6 +973,7 @@ function library:Window(name)
                     ZIndex = 9,
                     Parent = bg
                 })
+
                 local function update(input)
                     local perc = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
                     local rawValue = min + (max - min) * perc
@@ -873,6 +985,7 @@ function library:Window(name)
                         callback(value)
                     end
                 end
+
                 local dragging = false
                 bg.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -890,7 +1003,13 @@ function library:Window(name)
                         dragging = false
                     end
                 end)
+
+                library.flags[flag] = default
             end
+
+            -- -------------------------------------------------------------
+            -- BUTTON
+            -- -------------------------------------------------------------
             function sectionActions:Button(text, callback)
                 local btn = utility.create("TextButton", {
                     Size = UDim2.new(1, 0, 0, 34),
@@ -911,47 +1030,21 @@ function library:Window(name)
                     end
                 end)
             end
+
             return sectionActions
         end
+
         return tabActions
     end
-    -- Global search logic
-    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local query = string.lower(searchBox.Text)
-       
-        if currentTab and currentTab.LeftCol and currentTab.RightCol then
-            local cols = {currentTab.LeftCol, currentTab.RightCol}
-           
-            for _, col in ipairs(cols) do
-                for _, child in ipairs(col:GetChildren()) do
-                    if child.Name == "ZalSection" then
-                        local title = child:FindFirstChildWhichIsA("TextLabel")
-                        if title then
-                            local match = (query == "") or string.find(string.lower(title.Text), query, 1, true)
-                            child.Visible = match
-                        end
-                    end
-                end
-               
-                col.CanvasPosition = Vector2.new(0, 0)
-            end
-           
-            task.delay(0.05, function()
-                if currentTab.LeftCol then
-                    local leftList = currentTab.LeftCol:FindFirstChild("UIListLayout")
-                    if leftList then
-                        currentTab.LeftCol.CanvasSize = UDim2.new(0, 0, 0, leftList.AbsoluteContentSize.Y + 20)
-                    end
-                end
-                if currentTab.RightCol then
-                    local rightList = currentTab.RightCol:FindFirstChild("UIListLayout")
-                    if rightList then
-                        currentTab.RightCol.CanvasSize = UDim2.new(0, 0, 0, rightList.AbsoluteContentSize.Y + 20)
-                    end
-                end
-            end)
+
+    -- Update stats method
+    function library:SetStats(fps, ping)
+        if stats then
+            stats.Text = "FPS: " .. tostring(fps) .. "  PING: " .. tostring(ping) .. "ms"
         end
-    end)
+    end
+
     return windowActions
 end
-return library 
+
+return library
