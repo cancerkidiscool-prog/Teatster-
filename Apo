@@ -460,6 +460,28 @@ function library:Window(options)
     utility.create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = closeBtn})
     utility.stroke(closeBtn, Color3.fromRGB(45, 45, 60), 1)
 
+    -- Hover effects for window controls
+    closeBtn.MouseEnter:Connect(function()
+        utility.tween(closeBtn, {0.15}, {BackgroundColor3 = Color3.fromRGB(180, 40, 40)})
+        closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    end)
+    closeBtn.MouseLeave:Connect(function()
+        utility.tween(closeBtn, {0.15}, {BackgroundColor3 = Color3.fromRGB(25, 25, 35)})
+        closeBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    end)
+    minimizeBtn.MouseEnter:Connect(function()
+        utility.tween(minimizeBtn, {0.15}, {BackgroundColor3 = Color3.fromRGB(35, 35, 50)})
+    end)
+    minimizeBtn.MouseLeave:Connect(function()
+        utility.tween(minimizeBtn, {0.15}, {BackgroundColor3 = Color3.fromRGB(25, 25, 35)})
+    end)
+    maximizeBtn.MouseEnter:Connect(function()
+        utility.tween(maximizeBtn, {0.15}, {BackgroundColor3 = Color3.fromRGB(35, 35, 50)})
+    end)
+    maximizeBtn.MouseLeave:Connect(function()
+        utility.tween(maximizeBtn, {0.15}, {BackgroundColor3 = Color3.fromRGB(25, 25, 35)})
+    end)
+
     closeBtn.MouseButton1Click:Connect(function()
         toggleWindow()
     end)
@@ -772,7 +794,7 @@ function library:Window(options)
 
     -- ==================== CONTENT FRAME (below stats) ====================
     local contentArea = utility.create("Frame", {
-        Size = UDim2.new(1, -10, 1, -135),
+        Size = UDim2.new(1, -10, 1, -85),
         Position = UDim2.new(0, 5, 0, 80),
         BackgroundTransparency = 1,
         ZIndex = 3,
@@ -840,116 +862,16 @@ function library:Window(options)
     })
     utility.create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = saveBtn})
 
+    -- Save button hover effects
+    saveBtn.MouseEnter:Connect(function()
+        utility.tween(saveBtn, {0.2}, {BackgroundColor3 = library.accentLight})
+    end)
+    saveBtn.MouseLeave:Connect(function()
+        utility.tween(saveBtn, {0.2}, {BackgroundColor3 = library.accent})
+    end)
     saveBtn.MouseButton1Click:Connect(function()
         library:Notify({Title = "Config", Content = "Configuration saved!", Duration = 3})
     end)
-
-    -- ==================== PRESETS BAR (above bottom bar) ====================
-    local presetsBar = utility.create("Frame", {
-        Size = UDim2.new(1, -(sidebarWidth + 20), 0, 50),
-        Position = UDim2.new(0, sidebarWidth + 10, 1, -100),
-        BackgroundTransparency = 1,
-        ZIndex = 4,
-        Parent = holder
-    })
-
-    -- Presets section
-    local presetsLabel = utility.create("TextLabel", {
-        Size = UDim2.new(0, 70, 0, 16),
-        Position = UDim2.new(0, 5, 0, 0),
-        BackgroundTransparency = 1,
-        Text = "PRESETS",
-        TextColor3 = Color3.fromRGB(100, 100, 120),
-        TextSize = 11,
-        Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 5,
-        Parent = presetsBar
-    })
-
-    local presetsContainer = utility.create("Frame", {
-        Size = UDim2.new(0.55, 0, 0, 30),
-        Position = UDim2.new(0, 0, 0, 18),
-        BackgroundTransparency = 1,
-        ZIndex = 5,
-        Parent = presetsBar
-    })
-    utility.create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        Padding = UDim.new(0, 8),
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        Parent = presetsContainer
-    })
-
-    -- Configs section
-    local configsLabel = utility.create("TextLabel", {
-        Size = UDim2.new(0, 70, 0, 16),
-        Position = UDim2.new(0.58, 0, 0, 0),
-        BackgroundTransparency = 1,
-        Text = "CONFIGS",
-        TextColor3 = Color3.fromRGB(100, 100, 120),
-        TextSize = 11,
-        Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 5,
-        Parent = presetsBar
-    })
-
-    local configsContainer = utility.create("Frame", {
-        Size = UDim2.new(0.4, 0, 0, 30),
-        Position = UDim2.new(0.58, 0, 0, 18),
-        BackgroundTransparency = 1,
-        ZIndex = 5,
-        Parent = presetsBar
-    })
-    utility.create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        Padding = UDim.new(0, 8),
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        Parent = configsContainer
-    })
-
-    -- Helper to create preset/config buttons
-    local function createPresetButton(text, icon, parent, isActive)
-        local btn = utility.create("TextButton", {
-            Size = UDim2.new(0, 0, 0, 28),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundColor3 = isActive and Color3.fromRGB(25, 20, 40) or Color3.fromRGB(20, 20, 28),
-            BorderSizePixel = 0,
-            Text = "",
-            ZIndex = 6,
-            Parent = parent
-        })
-        utility.create("UICorner", {CornerRadius = UDim.new(0, 14), Parent = btn})
-        utility.stroke(btn, isActive and library.accent or Color3.fromRGB(45, 45, 60), 1)
-        utility.create("UIPadding", {
-            PaddingLeft = UDim.new(0, 12),
-            PaddingRight = UDim.new(0, 12),
-            Parent = btn
-        })
-        utility.create("TextLabel", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1,
-            Text = (icon and (icon .. "  ") or "") .. text,
-            TextColor3 = isActive and library.accent or Color3.fromRGB(150, 150, 160),
-            TextSize = 12,
-            Font = Enum.Font.Code,
-            ZIndex = 7,
-            Parent = btn
-        })
-        return btn
-    end
-
-    -- Default presets
-    createPresetButton("Farm Mode", "🌾", presetsContainer, true)
-    createPresetButton("Chest Run", "📦", presetsContainer, false)
-    createPresetButton("Loot Everything", "💎", presetsContainer, false)
-    createPresetButton("Safe Mode", "🛡️", presetsContainer, false)
-
-    -- Default configs
-    createPresetButton("Import", "↓", configsContainer, false)
-    createPresetButton("Export", "↑", configsContainer, false)
-    createPresetButton("Reset", "↺", configsContainer, false)
 
     -- ==================== TAB SYSTEM ====================
     local currentTab = nil
@@ -1119,6 +1041,16 @@ function library:Window(options)
         end
 
         tabBtn.MouseButton1Click:Connect(select)
+        -- Hover effects for sidebar tabs
+        tabBtn.MouseEnter:Connect(function()
+            if currentTab and currentTab.Btn == tabBtn then return end
+            utility.tween(tabBtn, {0.15}, {BackgroundTransparency = 0.9})
+            tabBtn.BackgroundColor3 = Color3.fromRGB(25, 22, 38)
+        end)
+        tabBtn.MouseLeave:Connect(function()
+            if currentTab and currentTab.Btn == tabBtn then return end
+            utility.tween(tabBtn, {0.15}, {BackgroundTransparency = 1})
+        end)
         table.insert(tabButtons, {btn = tabBtn, selectFn = select})
 
         if not currentTab then select() end
