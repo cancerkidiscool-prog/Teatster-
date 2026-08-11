@@ -437,7 +437,7 @@ function library:Window(name)
         Name = "BackgroundOverlay",
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = theme.window,
-        BackgroundTransparency = 0.35,   -- change to taste (0 = fully dark, 1 = invisible)
+        BackgroundTransparency = 0.55,   -- change to taste (0 = fully dark, 1 = invisible)
         BorderSizePixel = 0,
         ZIndex = 1,
         Parent = holder,
