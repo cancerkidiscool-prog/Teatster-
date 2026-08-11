@@ -2,6 +2,7 @@
     ZalHub UI Library  —  "CheatX" retro groupbox theme
     (full version – background cycles images rapidly like a GIF)
     Includes: Config save/load/delete system (auto-save, live UI update, automatic auto-load on start)
+    Now with: Overwrite Selected Config (quick update)
 --]]
 
 repeat wait() until game:IsLoaded()
@@ -801,7 +802,7 @@ function library:Window(name)
             sectionActions.Label = sectionActions.Divider
 
             ------------------------------------------------------------
-            -- checkbox toggle (respects pre-loaded flags)
+            -- checkbox toggle
             ------------------------------------------------------------
             function sectionActions:Toggle(text, flag, defaultOrCallback, callback)
                 local default, cb = false, nil
@@ -887,7 +888,7 @@ function library:Window(name)
             end
 
             ------------------------------------------------------------
-            -- slider (respects pre-loaded flags)
+            -- slider
             ------------------------------------------------------------
             function sectionActions:Slider(text, flag, min, max, default, callback, suffix)
                 local opts = {}
@@ -978,7 +979,7 @@ function library:Window(name)
             end
 
             ------------------------------------------------------------
-            -- dropdown (respects pre-loaded flags)
+            -- dropdown
             ------------------------------------------------------------
             function sectionActions:Dropdown(text, flag, list, callbackOrMulti, callback)
                 local multi, cb = false, nil
@@ -1229,7 +1230,7 @@ function library:Window(name)
             end
 
             ------------------------------------------------------------
-            -- textbox (respects pre-loaded flags)
+            -- textbox
             ------------------------------------------------------------
             function sectionActions:Textbox(text, flag, placeholder, callback)
                 local frame = utility.create("Frame", {
@@ -1499,7 +1500,6 @@ function library:ConfigSection(tabActions, side)
         if autoLoadName and autoLoadName ~= "" and library:ConfigExists(autoLoadName) then
             autoLoadEnabled = true
         else
-            -- Invalid, remove the file
             delfile(autoloadPath)
             autoLoadName = nil
         end
@@ -1541,6 +1541,18 @@ function library:ConfigSection(tabActions, side)
             library:LoadConfig(selected)
         else
             library:Notify({ Title = "Config", Content = "Select a config from the dropdown first.", Duration = 3 })
+        end
+    end)
+
+    -- NEW: Overwrite Selected Config (quick update)
+    section:Button("Overwrite Selected", function()
+        local selected = library.flags["__config_select"]
+        if selected and selected ~= "" then
+            library:SaveConfig(selected)
+            local newList = library:GetConfigs()
+            loadDropdown:Refresh(newList)
+        else
+            library:Notify({ Title = "Config", Content = "Select a config to overwrite.", Duration = 3 })
         end
     end)
 
@@ -1614,7 +1626,7 @@ function library:AutoLoadConfig()
     if isfile(autoloadPath) then
         local name = readfile(autoloadPath)
         if name and name ~= "" and isfile(CONFIG_FOLDER .. "/" .. name .. ".json") then
-            library:LoadConfig(name, true)  -- silent load
+            library:LoadConfig(name, true)
         end
     end
 end
