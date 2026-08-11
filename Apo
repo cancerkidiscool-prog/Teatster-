@@ -447,7 +447,7 @@ function library:Window(name)
     task.spawn(function()
         local idx = 1
         while true do
-            task.wait(0.1)   -- adjust speed: lower = faster, higher = slower
+            task.wait(0.3)   -- adjust speed: lower = faster, higher = slower
             idx = idx % #backgroundImages + 1
             bgImage.Image = "rbxassetid://" .. backgroundImages[idx]
         end
