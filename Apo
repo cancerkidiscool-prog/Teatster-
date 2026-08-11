@@ -1,32 +1,3 @@
---[[
-    ZalHub UI Library  —  "CheatX" retro groupbox theme
-    ---------------------------------------------------
-    Design reference: classic external-cheat menu look
-      * flat square windows, 1px light outlines
-      * groupboxes with the title inset into the top border
-      * centered "Main / Draw Fov / Checks" divider labels
-      * square checkbox toggles
-      * label-above sliders with a solid violet fill
-      * inset dropdowns with a square arrow button
-      * inline color pickers
-
-    API (backwards compatible with the old library)
-      local library  = loadstring(...)()
-      local window   = library:Window("CheatX")
-      local tab      = window:Tab("Legit")
-      local section  = tab:Section("Aim Assist", "left")   -- side is optional
-      section:Divider("Main")
-      local tgl = section:Toggle("Enabled", "aim_enabled", false, function(v) end)
-      tgl:ColorPicker("Fov Color", "fov_color", Color3.new(1,1,1), function(c) end)
-      section:Slider("Aimbot FOV", "aim_fov", 0, 360, 105, function(v) end, "°")
-      section:Dropdown("Hit Box", "aim_hitbox", {"Head","Torso"}, function(v) end)
-      section:Dropdown("Targets", "targets", {"A","B"}, true, function(t) end)  -- multi
-      section:Textbox("Name", "name", "placeholder", function(s) end)
-      section:Button("Execute", function() end)
-      section:ColorPicker("Chams Color", "chams", Color3.new(1,0,1), function(c) end)
-      library:Notify({ Title = "ZalHub", Content = "Loaded", Duration = 5 })
---]]
-
 repeat
     wait()
 until game:IsLoaded()
