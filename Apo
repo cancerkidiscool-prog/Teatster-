@@ -1,13 +1,24 @@
 --[[
     ZalHub UI Library  —  "CheatX" retro groupbox theme
     (full version – background cycles images rapidly like a GIF)
-    Includes: Config save/load/delete system
+    Includes: Config save/load/delete system (now with auto-save & live UI update)
 --]]
 
 repeat wait() until game:IsLoaded()
 
 local library = {
-    flags = {},
+    flags = setmetatable({}, {
+        __newindex = function(t, k, v)
+            rawset(t, k, v)
+            if not library._loading and library.FlagChanged then
+                library:FlagChanged(k)
+            end
+        end,
+    }),
+    uiElements = {},                        -- NEW: register all UI controls for live update
+    autoSaveEnabled = false,
+    autoSaveConfigName = nil,
+    _loading = false,
     accent = Color3.fromRGB(139, 92, 246),
     outline = { Color3.fromRGB(117, 52, 235), Color3.fromRGB(190, 140, 255) },
 }
@@ -29,18 +40,14 @@ library.theme = {
 
 local theme = library.theme
 
--- Safe GUI parent (CoreGui or PlayerGui)
+-- Safe GUI parent
 local function getGuiParent()
     local ok, core = pcall(function() return game:GetService("CoreGui") end)
     if ok and core then return core end
     return game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 end
 
-local services = setmetatable({}, {
-    __index = function(_, service)
-        return game:GetService(service)
-    end,
-})
+local services = setmetatable({}, { __index = function(_, service) return game:GetService(service) end })
 
 ----------------------------------------------------------------------
 -- utility
@@ -49,9 +56,7 @@ local utility = {}
 
 function utility.create(class, properties)
     local obj = Instance.new(class)
-    for prop, v in next, properties do
-        obj[prop] = v
-    end
+    for prop, v in next, properties do obj[prop] = v end
     return obj
 end
 
@@ -89,9 +94,7 @@ function utility.label(parent, text, props)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = parent,
     }
-    for k, v in next, props or {} do
-        base[k] = v
-    end
+    for k, v in next, props or {} do base[k] = v end
     return utility.create("TextLabel", base)
 end
 
@@ -124,10 +127,8 @@ function utility.dragify(object, inputFrame)
             if dragging and dragStart and startPos then
                 local delta = input.Position - dragStart
                 object.Position = UDim2.new(
-                    startPos.X.Scale,
-                    startPos.X.Offset + delta.X,
-                    startPos.Y.Scale,
-                    startPos.Y.Offset + delta.Y
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
                 )
             end
         end
@@ -147,10 +148,7 @@ function utility.draggableBar(track, onUpdate)
         end
     end)
     services.UserInputService.InputChanged:Connect(function(input)
-        if
-            dragging
-            and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch)
-        then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             update(input)
         end
     end)
@@ -161,21 +159,15 @@ function utility.draggableBar(track, onUpdate)
     end)
 end
 
--- table.find fallback for environments without it
 local function table_find(t, val)
-    for i, v in ipairs(t) do
-        if v == val then return i end
-    end
+    for i, v in ipairs(t) do if v == val then return i end end
     return nil
 end
 
--- Global color picker close manager
 local colorPanels = {}
 function utility.closeAllColorPanels(except)
     for _, panel in ipairs(colorPanels) do
-        if panel ~= except and panel.Visible then
-            panel.Visible = false
-        end
+        if panel ~= except and panel.Visible then panel.Visible = false end
     end
 end
 
@@ -225,9 +217,7 @@ function utility.colorpicker(row, flag, default, callback)
         preview.BackgroundColor3 = color
         swatch.BackgroundColor3 = color
         library.flags[flag] = color
-        if callback then
-            callback(color)
-        end
+        if callback then callback(color) end
     end
 
     local function channel(name, y, initial, setter)
@@ -281,13 +271,17 @@ function utility.colorpicker(row, flag, default, callback)
 
     library.flags[flag] = color
 
-    return {
+    local cpObj = {
         Swatch = swatch,
-        Set = function(_, newColor)
+        Set = function(_, newColor, fireCallback)
+            -- fireCallback defaults to true
             h, s, v = Color3.toHSV(newColor)
             apply()
+            if fireCallback ~= false and callback then callback(color) end
         end,
     }
+    library.uiElements[flag] = cpObj   -- NEW: register for live load
+    return cpObj
 end
 
 ----------------------------------------------------------------------
@@ -384,6 +378,28 @@ function library:Notify(options)
 end
 
 ----------------------------------------------------------------------
+-- auto-save debounce
+----------------------------------------------------------------------
+local autoSaveDebounce = false
+function library:ScheduleAutoSave()
+    if not library.autoSaveEnabled or not library.autoSaveConfigName then return end
+    if autoSaveDebounce then return end
+    autoSaveDebounce = true
+    task.delay(0.5, function()
+        autoSaveDebounce = false
+        if library.autoSaveEnabled and library.autoSaveConfigName then
+            library:SaveConfig(library.autoSaveConfigName)
+        end
+    end)
+end
+
+function library:FlagChanged(flag)
+    if not library._loading then
+        library:ScheduleAutoSave()
+    end
+end
+
+----------------------------------------------------------------------
 -- window
 ----------------------------------------------------------------------
 function library:Window(name)
@@ -404,23 +420,13 @@ function library:Window(name)
     holder.ClipsDescendants = true
     utility.stroke(holder, theme.outline, 1)
 
-    ------------------------------------------------------------------
-    -- BACKGROUND (fast-cycling GIF-like effect)
-    ------------------------------------------------------------------
+    -- BACKGROUND
     holder.BackgroundTransparency = 1
-
     local backgroundImages = {
-        138963728335206,
-        92649201368519,
-        109118923926044,
-        85401203390570,
-        116591768775487,
-        113920237539425,
-        99796065043428,
-        103460179042630,
-        110769603513462,
+        138963728335206, 92649201368519, 109118923926044,
+        85401203390570, 116591768775487, 113920237539425,
+        99796065043428, 103460179042630, 110769603513462,
     }
-
     local bgImage = utility.create("ImageLabel", {
         Name = "BackgroundGIF",
         Size = UDim2.new(1, 0, 1, 0),
@@ -430,7 +436,6 @@ function library:Window(name)
         ZIndex = 0,
         Parent = holder,
     })
-
     local overlay = utility.create("Frame", {
         Name = "BackgroundOverlay",
         Size = UDim2.new(1, 0, 1, 0),
@@ -440,7 +445,6 @@ function library:Window(name)
         ZIndex = 1,
         Parent = holder,
     })
-
     task.spawn(function()
         local idx = 1
         while true do
@@ -450,9 +454,7 @@ function library:Window(name)
         end
     end)
 
-    ------------------------------------------------------------------
-    -- watermark / toggle button
-    ------------------------------------------------------------------
+    -- toggle button
     local toggleGui = utility.create("ScreenGui", {
         Name = "ZalHub_Toggle",
         Parent = getGuiParent(),
@@ -494,15 +496,11 @@ function library:Window(name)
     toggleBtn.MouseButton1Click:Connect(toggleWindow)
     services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.RightShift then
-            toggleWindow()
-        end
+        if input.KeyCode == Enum.KeyCode.RightShift then toggleWindow() end
     end)
     utility.dragify(toggleBtn, toggleBtn)
 
-    ------------------------------------------------------------------
     -- title bar
-    ------------------------------------------------------------------
     local topBar = utility.create("Frame", {
         Name = "TopBar",
         Size = UDim2.new(1, 0, 0, 26),
@@ -527,9 +525,7 @@ function library:Window(name)
         ZIndex = 3,
     })
 
-    ------------------------------------------------------------------
     -- global search
-    ------------------------------------------------------------------
     local searchContainer = utility.create("Frame", {
         Name = "GlobalSearch",
         Size = UDim2.new(0, 170, 0, 16),
@@ -556,9 +552,7 @@ function library:Window(name)
         Parent = searchContainer,
     })
 
-    ------------------------------------------------------------------
     -- tab strip
-    ------------------------------------------------------------------
     local tabBar = utility.create("Frame", {
         Name = "TabBar",
         Size = UDim2.new(1, 0, 0, 26),
@@ -705,9 +699,7 @@ function library:Window(name)
             }
         end
         tabBtn.MouseButton1Click:Connect(select)
-        if not currentTab then
-            select()
-        end
+        if not currentTab then select() end
 
         local tabActions = {}
         local currentSectionIndex = 0
@@ -772,9 +764,6 @@ function library:Window(name)
 
             local sectionActions = {}
 
-            ------------------------------------------------------------
-            -- divider label
-            ------------------------------------------------------------
             function sectionActions:Divider(text)
                 local holderFrame = utility.create("Frame", {
                     Size = UDim2.new(1, 0, 0, 16),
@@ -867,9 +856,7 @@ function library:Window(name)
                     utility.tween(check, { 0.12 }, { BackgroundTransparency = enabled and 0 or 1 })
                     utility.tween(textLabel, { 0.12 }, { TextColor3 = enabled and theme.text or theme.dimText })
                     library.flags[flag] = enabled
-                    if fire ~= false and cb then
-                        cb(enabled)
-                    end
+                    if fire ~= false and cb then cb(enabled) end
                 end
 
                 library.flags[flag] = enabled
@@ -877,16 +864,17 @@ function library:Window(name)
                     set(not enabled)
                 end)
 
-                local toggleObj = { Row = row }
-                function toggleObj:Set(value)
-                    set(value and true or false)
-                end
-                function toggleObj:Get()
-                    return enabled
-                end
-                function toggleObj:ColorPicker(_, cpFlag, cpDefault, cpCallback)
-                    return utility.colorpicker(row, cpFlag, cpDefault, cpCallback)
-                end
+                local toggleObj = {
+                    Row = row,
+                    Set = function(_, val, fire)
+                        set(val and true or false, fire)
+                    end,
+                    Get = function() return enabled end,
+                    ColorPicker = function(_, cpFlag, cpDefault, cpCallback)
+                        return utility.colorpicker(row, cpFlag, cpDefault, cpCallback)
+                    end,
+                }
+                library.uiElements[flag] = toggleObj   -- NEW: register
                 return toggleObj
             end
 
@@ -915,9 +903,7 @@ function library:Window(name)
                 })
 
                 local function fmt(value)
-                    if decimals <= 0 then
-                        return string.format("%d", value)
-                    end
+                    if decimals <= 0 then return string.format("%d", value) end
                     return string.format("%." .. decimals .. "f", value)
                 end
 
@@ -959,9 +945,7 @@ function library:Window(name)
                     fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
                     label.Text = text .. ": " .. fmt(value) .. suffix
                     library.flags[flag] = value
-                    if fire ~= false and callback then
-                        callback(value)
-                    end
+                    if fire ~= false and callback then callback(value) end
                 end
 
                 library.flags[flag] = default
@@ -969,11 +953,13 @@ function library:Window(name)
                     setValue(min + (max - min) * perc)
                 end)
 
-                return {
-                    Set = function(_, value)
-                        setValue(value)
+                local sliderObj = {
+                    Set = function(_, value, fire)
+                        setValue(value, fire)
                     end,
                 }
+                library.uiElements[flag] = sliderObj   -- NEW: register
+                return sliderObj
             end
 
             ------------------------------------------------------------
@@ -1069,16 +1055,13 @@ function library:Window(name)
                 local function setOpen(state)
                     opened = state
                     listFrame.Visible = opened
-                    listFrame.Size = opened and UDim2.new(1, 0, 0, math.min(contentHeight, maxHeight))
-                        or UDim2.new(1, 0, 0, 0)
+                    listFrame.Size = opened and UDim2.new(1, 0, 0, math.min(contentHeight, maxHeight)) or UDim2.new(1, 0, 0, 0)
                     if opened then
                         listFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
                         listFrame.CanvasPosition = Vector2.new(0, 0)
                     end
                 end
-                btn.MouseButton1Click:Connect(function()
-                    setOpen(not opened)
-                end)
+                btn.MouseButton1Click:Connect(function() setOpen(not opened) end)
 
                 local function makeItem()
                     local item = utility.create("TextButton", {
@@ -1095,11 +1078,11 @@ function library:Window(name)
                         item.BackgroundColor3 = theme.hover
                         item.BackgroundTransparency = 0
                     end)
-                    item.MouseLeave:Connect(function()
-                        item.BackgroundTransparency = 1
-                    end)
+                    item.MouseLeave:Connect(function() item.BackgroundTransparency = 1 end)
                     return item
                 end
+
+                local dropdownObj = {}
 
                 if not multi then
                     for _, v in next, list do
@@ -1117,6 +1100,12 @@ function library:Window(name)
                             library.flags[flag] = v
                             if cb then cb(v) end
                         end)
+                    end
+
+                    function dropdownObj:Set(value, fire)
+                        valueLabel.Text = tostring(value)
+                        library.flags[flag] = value
+                        if fire ~= false and cb then cb(value) end
                     end
                 else
                     local selected = library.flags[flag]
@@ -1167,20 +1156,22 @@ function library:Window(name)
                             if cb then cb(selected) end
                         end)
                     end
+
+                    function dropdownObj:Set(value, fire)
+                        -- for multi, value is table
+                        if typeof(value) == "table" then
+                            selected = value
+                            library.flags[flag] = selected
+                            updateButtonText()
+                            -- Update marks? For simplicity skip visual mark update on load
+                            if fire ~= false and cb then cb(selected) end
+                        end
+                    end
                 end
 
-                local dropdownObj = {}
-                function dropdownObj:Set(value)
-                    valueLabel.Text = tostring(value)
-                    library.flags[flag] = value
-                    if cb then cb(value) end
-                end
                 function dropdownObj:Refresh(newList)
-                    -- Clear existing items
                     for _, child in ipairs(listFrame:GetChildren()) do
-                        if child:IsA("TextButton") then
-                            child:Destroy()
-                        end
+                        if child:IsA("TextButton") then child:Destroy() end
                     end
                     list = newList or {}
                     contentHeight = #list * rowHeight
@@ -1205,6 +1196,8 @@ function library:Window(name)
                         end
                     end
                 end
+
+                library.uiElements[flag] = dropdownObj   -- NEW: register
                 return dropdownObj
             end
 
@@ -1250,7 +1243,16 @@ function library:Window(name)
                     library.flags[flag] = box.Text
                     if callback then callback(box.Text) end
                 end)
-                return box
+
+                local tbObj = {
+                    Set = function(_, value, fire)
+                        box.Text = value
+                        library.flags[flag] = value
+                        if fire ~= false and callback then callback(value) end
+                    end,
+                }
+                library.uiElements[flag] = tbObj   -- NEW: register
+                return tbObj                       -- return wrapper instead of raw box
             end
 
             ------------------------------------------------------------
@@ -1270,15 +1272,9 @@ function library:Window(name)
                     Parent = items,
                 })
                 utility.stroke(btn, theme.controlOutline, 1)
-                btn.MouseEnter:Connect(function()
-                    utility.tween(btn, { 0.12 }, { BackgroundColor3 = library.accent })
-                end)
-                btn.MouseLeave:Connect(function()
-                    utility.tween(btn, { 0.12 }, { BackgroundColor3 = theme.titlebar })
-                end)
-                btn.MouseButton1Click:Connect(function()
-                    if callback then callback() end
-                end)
+                btn.MouseEnter:Connect(function() utility.tween(btn, { 0.12 }, { BackgroundColor3 = library.accent }) end)
+                btn.MouseLeave:Connect(function() utility.tween(btn, { 0.12 }, { BackgroundColor3 = theme.titlebar }) end)
+                btn.MouseButton1Click:Connect(function() if callback then callback() end end)
                 return btn
             end
 
@@ -1308,9 +1304,7 @@ function library:Window(name)
         return tabActions
     end
 
-    ------------------------------------------------------------------
-    -- global search: filter sections
-    ------------------------------------------------------------------
+    -- global search filter
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(searchBox.Text)
         if currentTab and currentTab.LeftCol and currentTab.RightCol then
@@ -1337,47 +1331,35 @@ function library:Window(name)
 end
 
 ----------------------------------------------------------------------
--- config system
+-- config system (auto-save & live UI update)
 ----------------------------------------------------------------------
 local HttpService = services.HttpService
 local CONFIG_FOLDER = "ZalHub"
 
 local function ensureFolder()
-    if not isfolder(CONFIG_FOLDER) then
-        makefolder(CONFIG_FOLDER)
-    end
+    if not isfolder(CONFIG_FOLDER) then makefolder(CONFIG_FOLDER) end
 end
 
--- Get list of all saved config names
 function library:GetConfigs()
     ensureFolder()
     local files = listfiles(CONFIG_FOLDER)
     local configs = {}
     for _, path in ipairs(files) do
         local name = path:match("([^/\\]+)%.json$")
-        if name then
-            table.insert(configs, name)
-        end
+        if name then table.insert(configs, name) end
     end
     table.sort(configs)
     return configs
 end
 
--- Save current flags to a named config file
 function library:SaveConfig(name)
     if not name or name == "" then
-        library:Notify({
-            Title = "Config",
-            Content = "Config name cannot be empty.",
-            Duration = 3,
-        })
+        library:Notify({ Title = "Config", Content = "Config name cannot be empty.", Duration = 3 })
         return false
     end
     ensureFolder()
-
     local data = {}
     for flag, value in pairs(library.flags) do
-        -- Skip internal config flags
         if string.sub(flag, 1, 2) ~= "__" then
             local t = typeof(value)
             if t == "boolean" or t == "number" or t == "string" then
@@ -1387,74 +1369,43 @@ function library:SaveConfig(name)
             elseif t == "table" then
                 local safe = true
                 for _, v in ipairs(value) do
-                    if typeof(v) ~= "string" and typeof(v) ~= "number" then
-                        safe = false
-                        break
-                    end
+                    if typeof(v) ~= "string" and typeof(v) ~= "number" then safe = false break end
                 end
-                if safe then
-                    data[flag] = { type = "table", value = value }
-                end
+                if safe then data[flag] = { type = "table", value = value } end
             end
         end
     end
 
-    local success, json = pcall(function()
-        return HttpService:JSONEncode(data)
-    end)
+    local success, json = pcall(function() return HttpService:JSONEncode(data) end)
     if not success then
-        library:Notify({
-            Title = "Config Error",
-            Content = "Failed to serialize config data.",
-            Duration = 4,
-        })
+        library:Notify({ Title = "Config Error", Content = "Failed to serialize config data.", Duration = 4 })
         return false
     end
-
     writefile(CONFIG_FOLDER .. "/" .. name .. ".json", json)
-    library:Notify({
-        Title = "Config Saved",
-        Content = 'Saved "' .. name .. '" with ' .. tostring(#(game:GetService("HttpService"):JSONEncode(data))) .. ' bytes.',
-        Duration = 3,
-    })
+    library:Notify({ Title = "Config Saved", Content = 'Saved "' .. name .. '".', Duration = 3 })
     return true
 end
 
--- Load a named config and apply values to library.flags
 function library:LoadConfig(name)
     if not name or name == "" then
-        library:Notify({
-            Title = "Config",
-            Content = "Config name cannot be empty.",
-            Duration = 3,
-        })
+        library:Notify({ Title = "Config", Content = "Config name cannot be empty.", Duration = 3 })
         return false
     end
     ensureFolder()
-
     local path = CONFIG_FOLDER .. "/" .. name .. ".json"
     if not isfile(path) then
-        library:Notify({
-            Title = "Config",
-            Content = 'Config "' .. name .. '" not found.',
-            Duration = 3,
-        })
+        library:Notify({ Title = "Config", Content = 'Config "' .. name .. '" not found.', Duration = 3 })
         return false
     end
-
     local json = readfile(path)
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(json)
-    end)
+    local ok, data = pcall(function() return HttpService:JSONDecode(json) end)
     if not ok or typeof(data) ~= "table" then
-        library:Notify({
-            Title = "Config Error",
-            Content = "Failed to parse config file.",
-            Duration = 4,
-        })
+        library:Notify({ Title = "Config Error", Content = "Failed to parse config file.", Duration = 4 })
         return false
     end
 
+    -- Prevent auto-save from triggering during load
+    library._loading = true
     local count = 0
     for flag, entry in pairs(data) do
         if entry.type == "Color3" then
@@ -1465,166 +1416,127 @@ function library:LoadConfig(name)
             library.flags[flag] = entry.value
         end
         count = count + 1
-    end
 
-    library:Notify({
-        Title = "Config Loaded",
-        Content = 'Loaded "' .. name .. '" (' .. count .. ' flags applied).',
-        Duration = 3,
-    })
+        -- Update the UI element if it exists (skip callbacks)
+        local el = library.uiElements[flag]
+        if el and el.Set then
+            el:Set(library.flags[flag], false)
+        end
+    end
+    library._loading = false
+
+    library:Notify({ Title = "Config Loaded", Content = 'Loaded "' .. name .. '" (' .. count .. ' flags applied).', Duration = 3 })
     return true
 end
 
--- Delete a named config file
 function library:DeleteConfig(name)
     if not name or name == "" then
-        library:Notify({
-            Title = "Config",
-            Content = "Config name cannot be empty.",
-            Duration = 3,
-        })
+        library:Notify({ Title = "Config", Content = "Config name cannot be empty.", Duration = 3 })
         return false
     end
     ensureFolder()
-
     local path = CONFIG_FOLDER .. "/" .. name .. ".json"
     if not isfile(path) then
-        library:Notify({
-            Title = "Config",
-            Content = 'Config "' .. name .. '" does not exist.',
-            Duration = 3,
-        })
+        library:Notify({ Title = "Config", Content = 'Config "' .. name .. '" does not exist.', Duration = 3 })
         return false
     end
-
     delfile(path)
-    library:Notify({
-        Title = "Config Deleted",
-        Content = 'Deleted "' .. name .. '" successfully.',
-        Duration = 3,
-    })
+    library:Notify({ Title = "Config Deleted", Content = 'Deleted "' .. name .. '" successfully.', Duration = 3 })
     return true
 end
 
--- Check if a config exists
 function library:ConfigExists(name)
     if not name or name == "" then return false end
     ensureFolder()
     return isfile(CONFIG_FOLDER .. "/" .. name .. ".json")
 end
 
--- Helper: Create a full config management section in a tab
--- Usage: library:ConfigSection(tabActions, "left")
+-- Config management UI (now includes auto-save)
 function library:ConfigSection(tabActions, side)
     local section = tabActions:Section("Configuration", side)
 
     section:Divider("Save / Load")
-
-    -- Config name input
     section:Textbox("Config Name", "__config_name", "my_config")
 
-    -- Save button
     section:Button("Save Config", function()
         local name = library.flags["__config_name"]
-        if name and name ~= "" then
-            library:SaveConfig(name)
-        else
-            library:Notify({
-                Title = "Config",
-                Content = "Enter a config name first.",
-                Duration = 3,
-            })
-        end
+        if name and name ~= "" then library:SaveConfig(name)
+        else library:Notify({ Title = "Config", Content = "Enter a config name first.", Duration = 3 }) end
     end)
 
     section:Divider("Manage")
-
-    -- Config list dropdown
     local configList = library:GetConfigs()
-    local loadDropdown = section:Dropdown("Select Config", "__config_select", configList, function(selected)
-        -- Just selecting, no action yet
-    end)
+    local loadDropdown = section:Dropdown("Select Config", "__config_select", configList, function(selected) end)
 
-    -- Load button
     section:Button("Load Selected", function()
         local selected = library.flags["__config_select"]
-        if selected and selected ~= "" then
-            library:LoadConfig(selected)
-        else
-            library:Notify({
-                Title = "Config",
-                Content = "Select a config from the dropdown first.",
-                Duration = 3,
-            })
-        end
+        if selected and selected ~= "" then library:LoadConfig(selected)
+        else library:Notify({ Title = "Config", Content = "Select a config from the dropdown first.", Duration = 3 }) end
     end)
 
-    -- Delete button
     section:Button("Delete Selected", function()
         local selected = library.flags["__config_select"]
         if selected and selected ~= "" then
             library:DeleteConfig(selected)
-            -- Refresh the dropdown after deletion
             local newList = library:GetConfigs()
             loadDropdown:Refresh(newList)
             library.flags["__config_select"] = nil
         else
-            library:Notify({
-                Title = "Config",
-                Content = "Select a config to delete.",
-                Duration = 3,
-            })
+            library:Notify({ Title = "Config", Content = "Select a config to delete.", Duration = 3 })
         end
     end)
 
-    -- Refresh list button
     section:Button("Refresh List", function()
         local newList = library:GetConfigs()
         loadDropdown:Refresh(newList)
-        library:Notify({
-            Title = "Config",
-            Content = "Found " .. #newList .. " saved config(s).",
-            Duration = 3,
-        })
+        library:Notify({ Title = "Config", Content = "Found " .. #newList .. " saved config(s).", Duration = 3 })
     end)
 
     section:Divider("Options")
 
-    -- Auto-load toggle
     section:Toggle("Auto-Load on Start", "__config_autoload", false, function(enabled)
         if enabled then
             local name = library.flags["__config_select"]
             if name and name ~= "" then
                 ensureFolder()
                 writefile(CONFIG_FOLDER .. "/_autoload.txt", name)
-                library:Notify({
-                    Title = "Config",
-                    Content = '"' .. name .. '" will auto-load on start.',
-                    Duration = 3,
-                })
+                library:Notify({ Title = "Config", Content = '"' .. name .. '" will auto-load on start.', Duration = 3 })
             else
-                library:Notify({
-                    Title = "Config",
-                    Content = "Select a config first to set as auto-load.",
-                    Duration = 3,
-                })
+                library:Notify({ Title = "Config", Content = "Select a config first to set as auto-load.", Duration = 3 })
             end
         else
-            if isfile(CONFIG_FOLDER .. "/_autoload.txt") then
-                delfile(CONFIG_FOLDER .. "/_autoload.txt")
+            if isfile(CONFIG_FOLDER .. "/_autoload.txt") then delfile(CONFIG_FOLDER .. "/_autoload.txt") end
+            library:Notify({ Title = "Config", Content = "Auto-load disabled.", Duration = 3 })
+        end
+    end)
+
+    section:Divider("Auto-Save")
+    section:Textbox("Auto-Save Name", "__autosave_config_name", "autosave", function(text)
+        if library.autoSaveEnabled then
+            library.autoSaveConfigName = text
+        end
+    end)
+
+    section:Toggle("Enable Auto-Save", "__autosave_enabled", false, function(enabled)
+        library.autoSaveEnabled = enabled
+        if enabled then
+            local name = library.flags["__autosave_config_name"]
+            if name and name ~= "" then
+                library.autoSaveConfigName = name
+                library:Notify({ Title = "Auto-Save", Content = "Auto-saving to \"" .. name .. "\" enabled.", Duration = 3 })
+            else
+                library:Notify({ Title = "Auto-Save", Content = "Please enter an auto-save config name first.", Duration = 3 })
+                library.autoSaveEnabled = false
             end
-            library:Notify({
-                Title = "Config",
-                Content = "Auto-load disabled.",
-                Duration = 3,
-            })
+        else
+            library.autoSaveConfigName = nil
+            library:Notify({ Title = "Auto-Save", Content = "Auto-save disabled.", Duration = 3 })
         end
     end)
 
     return section
 end
 
--- Auto-load config on start (call after window is created)
 function library:AutoLoadConfig()
     ensureFolder()
     local autoloadPath = CONFIG_FOLDER .. "/_autoload.txt"
