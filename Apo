@@ -1,3 +1,32 @@
+--[[
+    ZalHub UI Library  —  "CheatX" retro groupbox theme
+    ---------------------------------------------------
+    Design reference: classic external-cheat menu look
+      * flat square windows, 1px light outlines
+      * groupboxes with the title inset into the top border
+      * centered "Main / Draw Fov / Checks" divider labels
+      * square checkbox toggles
+      * label-above sliders with a solid violet fill
+      * inset dropdowns with a square arrow button
+      * inline color pickers
+
+    API (backwards compatible with the old library)
+      local library  = loadstring(...)()
+      local window   = library:Window("CheatX")
+      local tab      = window:Tab("Legit")
+      local section  = tab:Section("Aim Assist", "left")   -- side is optional
+      section:Divider("Main")
+      local tgl = section:Toggle("Enabled", "aim_enabled", false, function(v) end)
+      tgl:ColorPicker("Fov Color", "fov_color", Color3.new(1,1,1), function(c) end)
+      section:Slider("Aimbot FOV", "aim_fov", 0, 360, 105, function(v) end, "°")
+      section:Dropdown("Hit Box", "aim_hitbox", {"Head","Torso"}, function(v) end)
+      section:Dropdown("Targets", "targets", {"A","B"}, true, function(t) end)  -- multi
+      section:Textbox("Name", "name", "placeholder", function(s) end)
+      section:Button("Execute", function() end)
+      section:ColorPicker("Chams Color", "chams", Color3.new(1,0,1), function(c) end)
+      library:Notify({ Title = "ZalHub", Content = "Loaded", Duration = 5 })
+--]]
+
 repeat
     wait()
 until game:IsLoaded()
@@ -12,16 +41,17 @@ local library = {
 
 -- Flat retro palette taken from the reference screenshot
 library.theme = {
-    window = Color3.fromRGB(18, 19, 23), -- main panel / groupbox background
-    titlebar = Color3.fromRGB(70, 70, 70), -- title strip
-    outline = Color3.fromRGB(200, 200, 200), -- window outline
-    groupOutline = Color3.fromRGB(124, 124, 132), -- groupbox outline
-    divider = Color3.fromRGB(136, 96, 210), -- "Main" divider lines
-    control = Color3.fromRGB(30, 30, 30), -- inset controls (slider / dropdown)
-    controlOutline = Color3.fromRGB(158, 158, 158),
+    window = Color3.fromRGB(18, 19, 23), -- [WINDOW] main UI background
+    container = Color3.fromRGB(25, 26, 32), -- [CONTAINER] groupboxes / sections
+    titlebar = Color3.fromRGB(22, 23, 28), -- [TITLEBAR] title strip
+    outline = Color3.fromRGB(70, 72, 82), -- [OUTLINE] window outline
+    groupOutline = Color3.fromRGB(55, 57, 66), -- [GROUP OUTLINE] container border
+    divider = Color3.fromRGB(139, 92, 246), -- [DIVIDER] section divider
+    control = Color3.fromRGB(13, 14, 18), -- [CONTROL] sliders / dropdowns / inputs
+    controlOutline = Color3.fromRGB(65, 67, 78), -- [CONTROL OUTLINE]
     text = Color3.fromRGB(238, 238, 238),
-    dimText = Color3.fromRGB(168, 168, 168),
-    hover = Color3.fromRGB(46, 46, 46),
+    dimText = Color3.fromRGB(145, 147, 158), -- [DIM TEXT]
+    hover = Color3.fromRGB(35, 36, 44), -- [HOVER]
 }
 
 local theme = library.theme
@@ -669,7 +699,7 @@ function library:Window(name)
                 Name = "ZalSection",
                 Size = UDim2.new(1, 0, 0, 0),
                 AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundColor3 = theme.window,
+                BackgroundColor3 = theme.container,
                 BorderSizePixel = 0,
                 ZIndex = 4,
                 Parent = targetCol,
@@ -686,7 +716,7 @@ function library:Window(name)
                 Size = UDim2.new(0, 0, 0, 14),
                 AutomaticSize = Enum.AutomaticSize.X,
                 Position = UDim2.new(0, 10, 0, -7),
-                BackgroundColor3 = theme.window,
+                BackgroundColor3 = theme.container,
                 BackgroundTransparency = 0,
                 BorderSizePixel = 0,
                 TextColor3 = theme.text,
@@ -737,7 +767,7 @@ function library:Window(name)
                         Size = UDim2.new(0, 0, 1, 0),
                         AutomaticSize = Enum.AutomaticSize.X,
                         Position = UDim2.new(0.5, 0, 0.5, 0),
-                        BackgroundColor3 = theme.window,
+                        BackgroundColor3 = theme.container,
                         BackgroundTransparency = 0,
                         TextXAlignment = Enum.TextXAlignment.Center,
                         TextColor3 = theme.text,
@@ -1264,4 +1294,4 @@ function library:Window(name)
     return windowActions
 end
 
-return library
+return libary
