@@ -1,7 +1,7 @@
 --[[
     ZalHub UI Library  —  "CheatX" retro groupbox theme
     (full version – background cycles images rapidly like a GIF)
-    Includes: Config save/load/delete system (now with auto-save & live UI update)
+    Includes: Config save/load/delete system (auto-save, live UI update, and automatic auto-load on start)
 --]]
 
 repeat wait() until game:IsLoaded()
@@ -10,7 +10,6 @@ local library = {
     flags = setmetatable({}, {
         __newindex = function(t, k, v)
             rawset(t, k, v)
-            -- Fixed: guard against library being nil during initial construction
             if library and not library._loading and library.FlagChanged then
                 library:FlagChanged(k)
             end
@@ -174,6 +173,12 @@ end
 
 function utility.colorpicker(row, flag, default, callback)
     local color = default or library.accent
+    -- Use pre-loaded flag if available (must be Color3)
+    if library.flags[flag] ~= nil and typeof(library.flags[flag]) == "Color3" then
+        color = library.flags[flag]
+    else
+        library.flags[flag] = color
+    end
     local h, s, v = Color3.toHSV(color)
 
     local swatch = utility.create("TextButton", {
@@ -269,8 +274,6 @@ function utility.colorpicker(row, flag, default, callback)
         utility.closeAllColorPanels(panel)
         panel.Visible = not panel.Visible
     end)
-
-    library.flags[flag] = color
 
     local cpObj = {
         Swatch = swatch,
@@ -799,7 +802,7 @@ function library:Window(name)
             sectionActions.Label = sectionActions.Divider
 
             ------------------------------------------------------------
-            -- checkbox toggle
+            -- checkbox toggle (respects pre-loaded flags)
             ------------------------------------------------------------
             function sectionActions:Toggle(text, flag, defaultOrCallback, callback)
                 local default, cb = false, nil
@@ -812,7 +815,14 @@ function library:Window(name)
                     cb = callback
                 end
 
-                local enabled = default
+                local enabled
+                if library.flags[flag] ~= nil and type(library.flags[flag]) == "boolean" then
+                    enabled = library.flags[flag]
+                else
+                    enabled = default
+                    library.flags[flag] = enabled
+                end
+
                 local row = utility.create("TextButton", {
                     Size = UDim2.new(1, 0, 0, 18),
                     BackgroundTransparency = 1,
@@ -859,7 +869,6 @@ function library:Window(name)
                     if fire ~= false and cb then cb(enabled) end
                 end
 
-                library.flags[flag] = enabled
                 row.MouseButton1Click:Connect(function()
                     set(not enabled)
                 end)
@@ -879,7 +888,7 @@ function library:Window(name)
             end
 
             ------------------------------------------------------------
-            -- slider
+            -- slider (respects pre-loaded flags)
             ------------------------------------------------------------
             function sectionActions:Slider(text, flag, min, max, default, callback, suffix)
                 local opts = {}
@@ -894,6 +903,19 @@ function library:Window(name)
                     decimals = (min % 1 == 0 and max % 1 == 0 and default % 1 == 0) and 0 or 2
                 end
 
+                local initialValue
+                if library.flags[flag] ~= nil and type(library.flags[flag]) == "number" then
+                    initialValue = math.clamp(library.flags[flag], min, max)
+                else
+                    initialValue = default
+                    library.flags[flag] = initialValue
+                end
+
+                local function fmt(value)
+                    if decimals <= 0 then return string.format("%d", value) end
+                    return string.format("%." .. decimals .. "f", value)
+                end
+
                 local slider = utility.create("Frame", {
                     Size = UDim2.new(1, 0, 0, 34),
                     BackgroundTransparency = 1,
@@ -902,12 +924,7 @@ function library:Window(name)
                     Parent = items,
                 })
 
-                local function fmt(value)
-                    if decimals <= 0 then return string.format("%d", value) end
-                    return string.format("%." .. decimals .. "f", value)
-                end
-
-                local label = utility.label(slider, text .. ": " .. fmt(default) .. suffix, {
+                local label = utility.label(slider, text .. ": " .. fmt(initialValue) .. suffix, {
                     Size = UDim2.new(1, 0, 0, 16),
                     TextColor3 = theme.text,
                     TextSize = 13,
@@ -928,7 +945,7 @@ function library:Window(name)
                 utility.stroke(bg, theme.controlOutline, 1)
 
                 local fill = utility.create("Frame", {
-                    Size = UDim2.new(math.clamp((default - min) / (max - min), 0, 1), 0, 1, 0),
+                    Size = UDim2.new((initialValue - min) / (max - min), 0, 1, 0),
                     BackgroundColor3 = library.accent,
                     BorderSizePixel = 0,
                     ZIndex = 8,
@@ -948,7 +965,6 @@ function library:Window(name)
                     if fire ~= false and callback then callback(value) end
                 end
 
-                library.flags[flag] = default
                 utility.draggableBar(bg, function(perc)
                     setValue(min + (max - min) * perc)
                 end)
@@ -963,7 +979,7 @@ function library:Window(name)
             end
 
             ------------------------------------------------------------
-            -- dropdown
+            -- dropdown (respects pre-loaded flags)
             ------------------------------------------------------------
             function sectionActions:Dropdown(text, flag, list, callbackOrMulti, callback)
                 local multi, cb = false, nil
@@ -1085,6 +1101,12 @@ function library:Window(name)
                 local dropdownObj = {}
 
                 if not multi then
+                    -- single select
+                    local currentValue
+                    if library.flags[flag] ~= nil and type(library.flags[flag]) == "string" then
+                        currentValue = library.flags[flag]
+                    end
+
                     for _, v in next, list do
                         local item = makeItem()
                         utility.label(item, tostring(v), {
@@ -1102,14 +1124,24 @@ function library:Window(name)
                         end)
                     end
 
+                    if currentValue then
+                        valueLabel.Text = tostring(currentValue)
+                        library.flags[flag] = currentValue
+                    else
+                        library.flags[flag] = ""
+                    end
+
                     function dropdownObj:Set(value, fire)
                         valueLabel.Text = tostring(value)
                         library.flags[flag] = value
                         if fire ~= false and cb then cb(value) end
                     end
                 else
-                    local selected = library.flags[flag]
-                    if typeof(selected) ~= "table" then
+                    -- multi select
+                    local selected
+                    if library.flags[flag] ~= nil and type(library.flags[flag]) == "table" then
+                        selected = library.flags[flag]
+                    else
                         selected = {}
                         library.flags[flag] = selected
                     end
@@ -1200,7 +1232,7 @@ function library:Window(name)
             end
 
             ------------------------------------------------------------
-            -- textbox
+            -- textbox (respects pre-loaded flags)
             ------------------------------------------------------------
             function sectionActions:Textbox(text, flag, placeholder, callback)
                 local frame = utility.create("Frame", {
@@ -1216,6 +1248,14 @@ function library:Window(name)
                     TextSize = 13,
                     ZIndex = 7,
                 })
+
+                local initialText = ""
+                if library.flags[flag] ~= nil and type(library.flags[flag]) == "string" then
+                    initialText = library.flags[flag]
+                else
+                    library.flags[flag] = initialText
+                end
+
                 local box = utility.create("TextBox", {
                     Size = UDim2.new(1, 0, 0, 20),
                     Position = UDim2.new(0, 0, 0, 18),
@@ -1223,7 +1263,7 @@ function library:Window(name)
                     BorderSizePixel = 0,
                     PlaceholderText = placeholder or "...",
                     PlaceholderColor3 = Color3.fromRGB(110, 110, 110),
-                    Text = "",
+                    Text = initialText,
                     TextColor3 = theme.text,
                     TextSize = 13,
                     Font = Enum.Font.Code,
@@ -1384,21 +1424,22 @@ function library:SaveConfig(name)
     return true
 end
 
-function library:LoadConfig(name)
+-- Load a config. Set silent = true to suppress notification (used by auto-load).
+function library:LoadConfig(name, silent)
     if not name or name == "" then
-        library:Notify({ Title = "Config", Content = "Config name cannot be empty.", Duration = 3 })
+        if not silent then library:Notify({ Title = "Config", Content = "Config name cannot be empty.", Duration = 3 }) end
         return false
     end
     ensureFolder()
     local path = CONFIG_FOLDER .. "/" .. name .. ".json"
     if not isfile(path) then
-        library:Notify({ Title = "Config", Content = 'Config "' .. name .. '" not found.', Duration = 3 })
+        if not silent then library:Notify({ Title = "Config", Content = 'Config "' .. name .. '" not found.', Duration = 3 }) end
         return false
     end
     local json = readfile(path)
     local ok, data = pcall(function() return HttpService:JSONDecode(json) end)
     if not ok or typeof(data) ~= "table" then
-        library:Notify({ Title = "Config Error", Content = "Failed to parse config file.", Duration = 4 })
+        if not silent then library:Notify({ Title = "Config Error", Content = "Failed to parse config file.", Duration = 4 }) end
         return false
     end
 
@@ -1421,7 +1462,9 @@ function library:LoadConfig(name)
     end
     library._loading = false
 
-    library:Notify({ Title = "Config Loaded", Content = 'Loaded "' .. name .. '" (' .. count .. ' flags applied).', Duration = 3 })
+    if not silent then
+        library:Notify({ Title = "Config Loaded", Content = 'Loaded "' .. name .. '" (' .. count .. ' flags applied).', Duration = 3 })
+    end
     return true
 end
 
@@ -1532,15 +1575,19 @@ function library:ConfigSection(tabActions, side)
     return section
 end
 
+-- Automatically load the config that was set to auto-load
 function library:AutoLoadConfig()
     ensureFolder()
     local autoloadPath = CONFIG_FOLDER .. "/_autoload.txt"
     if isfile(autoloadPath) then
         local name = readfile(autoloadPath)
         if name and name ~= "" and isfile(CONFIG_FOLDER .. "/" .. name .. ".json") then
-            library:LoadConfig(name)
+            library:LoadConfig(name, true)  -- silent load, no notification
         end
     end
 end
+
+-- Auto-load immediately when the library is first loaded (once at the top of the script)
+library:AutoLoadConfig()
 
 return library
