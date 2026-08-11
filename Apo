@@ -1,30 +1,7 @@
 --[[
     ZalHub UI Library  —  "CheatX" retro groupbox theme
-    ---------------------------------------------------
-    Design reference: classic external-cheat menu look
-      * flat square windows, 1px light outlines
-      * groupboxes with the title inset into the top border
-      * centered "Main / Draw Fov / Checks" divider labels
-      * square checkbox toggles
-      * label-above sliders with a solid violet fill
-      * inset dropdowns with a square arrow button
-      * inline color pickers
-
-    API (backwards compatible with the old library)
-      local library  = loadstring(...)()
-      local window   = library:Window("CheatX")
-      local tab      = window:Tab("Legit")
-      local section  = tab:Section("Aim Assist", "left")   -- side is optional
-      section:Divider("Main")
-      local tgl = section:Toggle("Enabled", "aim_enabled", false, function(v) end)
-      tgl:ColorPicker("Fov Color", "fov_color", Color3.new(1,1,1), function(c) end)
-      section:Slider("Aimbot FOV", "aim_fov", 0, 360, 105, function(v) end, "°")
-      section:Dropdown("Hit Box", "aim_hitbox", {"Head","Torso"}, function(v) end)
-      section:Dropdown("Targets", "targets", {"A","B"}, true, function(t) end)  -- multi
-      section:Textbox("Name", "name", "placeholder", function(s) end)
-      section:Button("Execute", function() end)
-      section:ColorPicker("Chams Color", "chams", Color3.new(1,0,1), function(c) end)
-      library:Notify({ Title = "ZalHub", Content = "Loaded", Duration = 5 })
+    (full version – background now shows all 9 images at once,
+     animated with a gentle floating effect)
 --]]
 
 repeat wait() until game:IsLoaded()
@@ -428,10 +405,26 @@ function library:Window(name)
     utility.stroke(holder, theme.outline, 1)
 
     ------------------------------------------------------------------
-    -- BACKGROUND SLIDESHOW (FIXED – VISIBLE)
+    -- ANIMATED BACKGROUND: all 9 images visible at once, gently floating
     ------------------------------------------------------------------
-    -- Make the holder transparent to see the images behind it
-    holder.BackgroundTransparency = 1
+    holder.BackgroundTransparency = 1   -- make the window background transparent
+
+    -- 3x3 grid that fills the whole window
+    local gridFrame = utility.create("Frame", {
+        Name = "BackgroundGrid",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Parent = holder,
+    })
+
+    local gridLayout = utility.create("UIGridLayout", {
+        CellSize = UDim2.new(1/3, 0, 1/3, 0),    -- exactly 3 columns and 3 rows
+        CellPadding = UDim2.new(0, 0, 0, 0),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = gridFrame,
+    })
 
     local backgroundImages = {
         138963728335206,
@@ -445,40 +438,44 @@ function library:Window(name)
         110769603513462,
     }
 
-    -- The image slideshow (behind everything)
-    local bgImage = utility.create("ImageLabel", {
-        Name = "BackgroundSlideshow",
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        ScaleType = Enum.ScaleType.Stretch,   -- fills the window
-        Image = "rbxassetid://" .. backgroundImages[1],
-        ZIndex = 0,
-        Parent = holder,
-    })
+    -- Create one ImageLabel per cell
+    local imageFrames = {}
+    for i = 1, #backgroundImages do
+        local img = utility.create("ImageLabel", {
+            Name = "BgImg" .. i,
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            ScaleType = Enum.ScaleType.Stretch,     -- fill the cell
+            Image = "rbxassetid://" .. backgroundImages[i],
+            ZIndex = 0,
+            Parent = gridFrame,
+        })
+        table.insert(imageFrames, img)
+    end
 
-    -- A dark overlay to keep UI readable
+    -- Dark overlay to keep UI readable (sits above the images but below controls)
     local overlay = utility.create("Frame", {
         Name = "BackgroundOverlay",
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = theme.window,
-        BackgroundTransparency = 0.35,        -- 0 = fully dark, 1 = completely see‑through
+        BackgroundTransparency = 0.35,    -- adjust to taste
         BorderSizePixel = 0,
         ZIndex = 1,
         Parent = holder,
     })
 
-    -- Infinite loop: fade between images every 5 seconds
+    -- Floating animation: each image moves randomly within its cell
     task.spawn(function()
-        local currentIndex = 1
         while true do
-            task.wait(5)
-            utility.tween(bgImage, { 0.5, Enum.EasingStyle.Linear }, { ImageTransparency = 1 })
-            task.wait(0.5)
-
-            currentIndex = (currentIndex % #backgroundImages) + 1
-            bgImage.Image = "rbxassetid://" .. backgroundImages[currentIndex]
-
-            utility.tween(bgImage, { 0.5, Enum.EasingStyle.Linear }, { ImageTransparency = 0 })
+            for _, img in ipairs(imageFrames) do
+                -- random offset between -8 and +8 pixels on X and Y
+                local offsetX = math.random(-8, 8)
+                local offsetY = math.random(-8, 8)
+                -- tween to the new position (relative to its cell, so use UDim2 with 0 scale)
+                local targetPos = UDim2.new(0, offsetX, 0, offsetY)
+                utility.tween(img, { 1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut }, { Position = targetPos })
+            end
+            task.wait(1.5)   -- change direction every 1.5 seconds – gives a gentle drift
         end
     end)
 
