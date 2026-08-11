@@ -1,7 +1,7 @@
 --[[
     ZalHub UI Library  —  "CheatX" retro groupbox theme
     (full version – background cycles images rapidly like a GIF)
-    Includes: Config save/load/delete system (auto-save, live UI update, and automatic auto-load on start)
+    Includes: Config save/load/delete system (auto-save, live UI update, automatic auto-load on start)
 --]]
 
 repeat wait() until game:IsLoaded()
@@ -173,7 +173,6 @@ end
 
 function utility.colorpicker(row, flag, default, callback)
     local color = default or library.accent
-    -- Use pre-loaded flag if available (must be Color3)
     if library.flags[flag] ~= nil and typeof(library.flags[flag]) == "Color3" then
         color = library.flags[flag]
     else
@@ -1101,7 +1100,6 @@ function library:Window(name)
                 local dropdownObj = {}
 
                 if not multi then
-                    -- single select
                     local currentValue
                     if library.flags[flag] ~= nil and type(library.flags[flag]) == "string" then
                         currentValue = library.flags[flag]
@@ -1137,7 +1135,6 @@ function library:Window(name)
                         if fire ~= false and cb then cb(value) end
                     end
                 else
-                    -- multi select
                     local selected
                     if library.flags[flag] ~= nil and type(library.flags[flag]) == "table" then
                         selected = library.flags[flag]
@@ -1424,7 +1421,6 @@ function library:SaveConfig(name)
     return true
 end
 
--- Load a config. Set silent = true to suppress notification (used by auto-load).
 function library:LoadConfig(name, silent)
     if not name or name == "" then
         if not silent then library:Notify({ Title = "Config", Content = "Config name cannot be empty.", Duration = 3 }) end
@@ -1493,13 +1489,46 @@ end
 function library:ConfigSection(tabActions, side)
     local section = tabActions:Section("Configuration", side)
 
+    -- Pre-load auto-load state
+    ensureFolder()
+    local autoloadPath = CONFIG_FOLDER .. "/_autoload.txt"
+    local autoLoadName = nil
+    local autoLoadEnabled = false
+    if isfile(autoloadPath) then
+        autoLoadName = readfile(autoloadPath)
+        if autoLoadName and autoLoadName ~= "" and library:ConfigExists(autoLoadName) then
+            autoLoadEnabled = true
+        else
+            -- Invalid, remove the file
+            delfile(autoloadPath)
+            autoLoadName = nil
+        end
+    end
+
+    -- Set flags before creating UI elements so they pick up the saved values
+    library.flags["__config_name"] = library.flags["__config_name"] or "my_config"
+    if autoLoadName then
+        library.flags["__config_select"] = autoLoadName
+    else
+        library.flags["__config_select"] = library.flags["__config_select"] or ""
+    end
+    library.flags["__config_autoload"] = autoLoadEnabled
+    library.flags["__autosave_config_name"] = library.flags["__autosave_config_name"] or "autosave"
+    library.flags["__autosave_enabled"] = library.flags["__autosave_enabled"] or false
+
     section:Divider("Save / Load")
     section:Textbox("Config Name", "__config_name", "my_config")
 
     section:Button("Save Config", function()
         local name = library.flags["__config_name"]
-        if name and name ~= "" then library:SaveConfig(name)
-        else library:Notify({ Title = "Config", Content = "Enter a config name first.", Duration = 3 }) end
+        if name and name ~= "" then
+            library:SaveConfig(name)
+            local newList = library:GetConfigs()
+            loadDropdown:Refresh(newList)
+            library.flags["__config_select"] = name
+        else
+            library:Notify({ Title = "Config", Content = "Enter a config name first.", Duration = 3 })
+        end
     end)
 
     section:Divider("Manage")
@@ -1508,8 +1537,11 @@ function library:ConfigSection(tabActions, side)
 
     section:Button("Load Selected", function()
         local selected = library.flags["__config_select"]
-        if selected and selected ~= "" then library:LoadConfig(selected)
-        else library:Notify({ Title = "Config", Content = "Select a config from the dropdown first.", Duration = 3 }) end
+        if selected and selected ~= "" then
+            library:LoadConfig(selected)
+        else
+            library:Notify({ Title = "Config", Content = "Select a config from the dropdown first.", Duration = 3 })
+        end
     end)
 
     section:Button("Delete Selected", function()
@@ -1518,7 +1550,7 @@ function library:ConfigSection(tabActions, side)
             library:DeleteConfig(selected)
             local newList = library:GetConfigs()
             loadDropdown:Refresh(newList)
-            library.flags["__config_select"] = nil
+            library.flags["__config_select"] = ""
         else
             library:Notify({ Title = "Config", Content = "Select a config to delete.", Duration = 3 })
         end
@@ -1532,7 +1564,7 @@ function library:ConfigSection(tabActions, side)
 
     section:Divider("Options")
 
-    section:Toggle("Auto-Load on Start", "__config_autoload", false, function(enabled)
+    section:Toggle("Auto-Load on Start", "__config_autoload", function(enabled)
         if enabled then
             local name = library.flags["__config_select"]
             if name and name ~= "" then
@@ -1541,6 +1573,7 @@ function library:ConfigSection(tabActions, side)
                 library:Notify({ Title = "Config", Content = '"' .. name .. '" will auto-load on start.', Duration = 3 })
             else
                 library:Notify({ Title = "Config", Content = "Select a config first to set as auto-load.", Duration = 3 })
+                library.flags["__config_autoload"] = false
             end
         else
             if isfile(CONFIG_FOLDER .. "/_autoload.txt") then delfile(CONFIG_FOLDER .. "/_autoload.txt") end
@@ -1555,7 +1588,7 @@ function library:ConfigSection(tabActions, side)
         end
     end)
 
-    section:Toggle("Enable Auto-Save", "__autosave_enabled", false, function(enabled)
+    section:Toggle("Enable Auto-Save", "__autosave_enabled", function(enabled)
         library.autoSaveEnabled = enabled
         if enabled then
             local name = library.flags["__autosave_config_name"]
@@ -1575,19 +1608,18 @@ function library:ConfigSection(tabActions, side)
     return section
 end
 
--- Automatically load the config that was set to auto-load
 function library:AutoLoadConfig()
     ensureFolder()
     local autoloadPath = CONFIG_FOLDER .. "/_autoload.txt"
     if isfile(autoloadPath) then
         local name = readfile(autoloadPath)
         if name and name ~= "" and isfile(CONFIG_FOLDER .. "/" .. name .. ".json") then
-            library:LoadConfig(name, true)  -- silent load, no notification
+            library:LoadConfig(name, true)  -- silent load
         end
     end
 end
 
--- Auto-load immediately when the library is first loaded (once at the top of the script)
+-- Auto-load immediately when the library is first loaded
 library:AutoLoadConfig()
 
 return library
