@@ -41,7 +41,7 @@ local library = {
 
 -- Flat retro palette taken from the reference screenshot
 library.theme = {
-    window = Color3.fromRGB(58, 58, 58), -- main panel / groupbox background
+    window = Color3.fromRGB(18, 19, 23), -- main panel / groupbox background
     titlebar = Color3.fromRGB(70, 70, 70), -- title strip
     outline = Color3.fromRGB(200, 200, 200), -- window outline
     groupOutline = Color3.fromRGB(124, 124, 132), -- groupbox outline
