@@ -10,12 +10,13 @@ local library = {
     flags = setmetatable({}, {
         __newindex = function(t, k, v)
             rawset(t, k, v)
-            if not library._loading and library.FlagChanged then
+            -- Fixed: guard against library being nil during initial construction
+            if library and not library._loading and library.FlagChanged then
                 library:FlagChanged(k)
             end
         end,
     }),
-    uiElements = {},                        -- NEW: register all UI controls for live update
+    uiElements = {},                        -- register all UI controls for live update
     autoSaveEnabled = false,
     autoSaveConfigName = nil,
     _loading = false,
@@ -274,13 +275,12 @@ function utility.colorpicker(row, flag, default, callback)
     local cpObj = {
         Swatch = swatch,
         Set = function(_, newColor, fireCallback)
-            -- fireCallback defaults to true
             h, s, v = Color3.toHSV(newColor)
             apply()
             if fireCallback ~= false and callback then callback(color) end
         end,
     }
-    library.uiElements[flag] = cpObj   -- NEW: register for live load
+    library.uiElements[flag] = cpObj
     return cpObj
 end
 
@@ -874,7 +874,7 @@ function library:Window(name)
                         return utility.colorpicker(row, cpFlag, cpDefault, cpCallback)
                     end,
                 }
-                library.uiElements[flag] = toggleObj   -- NEW: register
+                library.uiElements[flag] = toggleObj
                 return toggleObj
             end
 
@@ -958,7 +958,7 @@ function library:Window(name)
                         setValue(value, fire)
                     end,
                 }
-                library.uiElements[flag] = sliderObj   -- NEW: register
+                library.uiElements[flag] = sliderObj
                 return sliderObj
             end
 
@@ -1158,12 +1158,10 @@ function library:Window(name)
                     end
 
                     function dropdownObj:Set(value, fire)
-                        -- for multi, value is table
                         if typeof(value) == "table" then
                             selected = value
                             library.flags[flag] = selected
                             updateButtonText()
-                            -- Update marks? For simplicity skip visual mark update on load
                             if fire ~= false and cb then cb(selected) end
                         end
                     end
@@ -1197,7 +1195,7 @@ function library:Window(name)
                     end
                 end
 
-                library.uiElements[flag] = dropdownObj   -- NEW: register
+                library.uiElements[flag] = dropdownObj
                 return dropdownObj
             end
 
@@ -1251,8 +1249,8 @@ function library:Window(name)
                         if fire ~= false and callback then callback(value) end
                     end,
                 }
-                library.uiElements[flag] = tbObj   -- NEW: register
-                return tbObj                       -- return wrapper instead of raw box
+                library.uiElements[flag] = tbObj
+                return tbObj
             end
 
             ------------------------------------------------------------
@@ -1404,7 +1402,6 @@ function library:LoadConfig(name)
         return false
     end
 
-    -- Prevent auto-save from triggering during load
     library._loading = true
     local count = 0
     for flag, entry in pairs(data) do
@@ -1417,7 +1414,6 @@ function library:LoadConfig(name)
         end
         count = count + 1
 
-        -- Update the UI element if it exists (skip callbacks)
         local el = library.uiElements[flag]
         if el and el.Set then
             el:Set(library.flags[flag], false)
@@ -1451,7 +1447,6 @@ function library:ConfigExists(name)
     return isfile(CONFIG_FOLDER .. "/" .. name .. ".json")
 end
 
--- Config management UI (now includes auto-save)
 function library:ConfigSection(tabActions, side)
     local section = tabActions:Section("Configuration", side)
 
