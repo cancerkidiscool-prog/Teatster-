@@ -1,6 +1,7 @@
 --[[
     ZalHub UI Library  —  "CheatX" retro groupbox theme
     (full version – background cycles images rapidly like a GIF)
+    Includes: Config save/load/delete system
 --]]
 
 repeat wait() until game:IsLoaded()
@@ -30,8 +31,8 @@ local theme = library.theme
 
 -- Safe GUI parent (CoreGui or PlayerGui)
 local function getGuiParent()
-    local core = game:GetService("CoreGui")
-    if core then return core end
+    local ok, core = pcall(function() return game:GetService("CoreGui") end)
+    if ok and core then return core end
     return game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 end
 
@@ -404,11 +405,10 @@ function library:Window(name)
     utility.stroke(holder, theme.outline, 1)
 
     ------------------------------------------------------------------
-    -- BACKGROUND (fast‑cycling GIF‑like effect)
+    -- BACKGROUND (fast-cycling GIF-like effect)
     ------------------------------------------------------------------
-    holder.BackgroundTransparency = 1  -- make the window background see‑through
+    holder.BackgroundTransparency = 1
 
-    -- The list of your image asset IDs
     local backgroundImages = {
         138963728335206,
         92649201368519,
@@ -421,33 +421,30 @@ function library:Window(name)
         110769603513462,
     }
 
-    -- Single ImageLabel that we'll change quickly
     local bgImage = utility.create("ImageLabel", {
         Name = "BackgroundGIF",
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
-        ScaleType = Enum.ScaleType.Stretch,     -- fill the window
+        ScaleType = Enum.ScaleType.Stretch,
         Image = "rbxassetid://" .. backgroundImages[1],
         ZIndex = 0,
         Parent = holder,
     })
 
-    -- Semi‑transparent dark overlay to keep the UI readable
     local overlay = utility.create("Frame", {
         Name = "BackgroundOverlay",
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = theme.window,
-        BackgroundTransparency = 0.55,   -- change to taste (0 = fully dark, 1 = invisible)
+        BackgroundTransparency = 0.55,
         BorderSizePixel = 0,
         ZIndex = 1,
         Parent = holder,
     })
 
-    -- Rapidly cycle through the images (no tweens, no fades – just switch)
     task.spawn(function()
         local idx = 1
         while true do
-            task.wait(0.2)   -- adjust speed: lower = faster, higher = slower
+            task.wait(0.2)
             idx = idx % #backgroundImages + 1
             bgImage.Image = "rbxassetid://" .. backgroundImages[idx]
         end
@@ -1172,13 +1169,43 @@ function library:Window(name)
                     end
                 end
 
-                return {
-                    Set = function(_, value)
-                        valueLabel.Text = tostring(value)
-                        library.flags[flag] = value
-                        if cb then cb(value) end
-                    end,
-                }
+                local dropdownObj = {}
+                function dropdownObj:Set(value)
+                    valueLabel.Text = tostring(value)
+                    library.flags[flag] = value
+                    if cb then cb(value) end
+                end
+                function dropdownObj:Refresh(newList)
+                    -- Clear existing items
+                    for _, child in ipairs(listFrame:GetChildren()) do
+                        if child:IsA("TextButton") then
+                            child:Destroy()
+                        end
+                    end
+                    list = newList or {}
+                    contentHeight = #list * rowHeight
+                    listFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+
+                    if not multi then
+                        for _, v in next, list do
+                            local item = makeItem()
+                            utility.label(item, tostring(v), {
+                                Size = UDim2.new(1, -10, 1, 0),
+                                Position = UDim2.new(0, 5, 0, 0),
+                                TextColor3 = theme.dimText,
+                                TextSize = 13,
+                                ZIndex = 22,
+                            })
+                            item.MouseButton1Click:Connect(function()
+                                valueLabel.Text = tostring(v)
+                                setOpen(false)
+                                library.flags[flag] = v
+                                if cb then cb(v) end
+                            end)
+                        end
+                    end
+                end
+                return dropdownObj
             end
 
             ------------------------------------------------------------
@@ -1307,6 +1334,306 @@ function library:Window(name)
     end)
 
     return windowActions
+end
+
+----------------------------------------------------------------------
+-- config system
+----------------------------------------------------------------------
+local HttpService = services.HttpService
+local CONFIG_FOLDER = "ZalHub"
+
+local function ensureFolder()
+    if not isfolder(CONFIG_FOLDER) then
+        makefolder(CONFIG_FOLDER)
+    end
+end
+
+-- Get list of all saved config names
+function library:GetConfigs()
+    ensureFolder()
+    local files = listfiles(CONFIG_FOLDER)
+    local configs = {}
+    for _, path in ipairs(files) do
+        local name = path:match("([^/\\]+)%.json$")
+        if name then
+            table.insert(configs, name)
+        end
+    end
+    table.sort(configs)
+    return configs
+end
+
+-- Save current flags to a named config file
+function library:SaveConfig(name)
+    if not name or name == "" then
+        library:Notify({
+            Title = "Config",
+            Content = "Config name cannot be empty.",
+            Duration = 3,
+        })
+        return false
+    end
+    ensureFolder()
+
+    local data = {}
+    for flag, value in pairs(library.flags) do
+        -- Skip internal config flags
+        if string.sub(flag, 1, 2) ~= "__" then
+            local t = typeof(value)
+            if t == "boolean" or t == "number" or t == "string" then
+                data[flag] = { type = t, value = value }
+            elseif t == "Color3" then
+                data[flag] = { type = "Color3", value = { R = value.R, G = value.G, B = value.B } }
+            elseif t == "table" then
+                local safe = true
+                for _, v in ipairs(value) do
+                    if typeof(v) ~= "string" and typeof(v) ~= "number" then
+                        safe = false
+                        break
+                    end
+                end
+                if safe then
+                    data[flag] = { type = "table", value = value }
+                end
+            end
+        end
+    end
+
+    local success, json = pcall(function()
+        return HttpService:JSONEncode(data)
+    end)
+    if not success then
+        library:Notify({
+            Title = "Config Error",
+            Content = "Failed to serialize config data.",
+            Duration = 4,
+        })
+        return false
+    end
+
+    writefile(CONFIG_FOLDER .. "/" .. name .. ".json", json)
+    library:Notify({
+        Title = "Config Saved",
+        Content = 'Saved "' .. name .. '" with ' .. tostring(#(game:GetService("HttpService"):JSONEncode(data))) .. ' bytes.',
+        Duration = 3,
+    })
+    return true
+end
+
+-- Load a named config and apply values to library.flags
+function library:LoadConfig(name)
+    if not name or name == "" then
+        library:Notify({
+            Title = "Config",
+            Content = "Config name cannot be empty.",
+            Duration = 3,
+        })
+        return false
+    end
+    ensureFolder()
+
+    local path = CONFIG_FOLDER .. "/" .. name .. ".json"
+    if not isfile(path) then
+        library:Notify({
+            Title = "Config",
+            Content = 'Config "' .. name .. '" not found.',
+            Duration = 3,
+        })
+        return false
+    end
+
+    local json = readfile(path)
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(json)
+    end)
+    if not ok or typeof(data) ~= "table" then
+        library:Notify({
+            Title = "Config Error",
+            Content = "Failed to parse config file.",
+            Duration = 4,
+        })
+        return false
+    end
+
+    local count = 0
+    for flag, entry in pairs(data) do
+        if entry.type == "Color3" then
+            library.flags[flag] = Color3.new(entry.value.R, entry.value.G, entry.value.B)
+        elseif entry.type == "table" then
+            library.flags[flag] = entry.value
+        else
+            library.flags[flag] = entry.value
+        end
+        count = count + 1
+    end
+
+    library:Notify({
+        Title = "Config Loaded",
+        Content = 'Loaded "' .. name .. '" (' .. count .. ' flags applied).',
+        Duration = 3,
+    })
+    return true
+end
+
+-- Delete a named config file
+function library:DeleteConfig(name)
+    if not name or name == "" then
+        library:Notify({
+            Title = "Config",
+            Content = "Config name cannot be empty.",
+            Duration = 3,
+        })
+        return false
+    end
+    ensureFolder()
+
+    local path = CONFIG_FOLDER .. "/" .. name .. ".json"
+    if not isfile(path) then
+        library:Notify({
+            Title = "Config",
+            Content = 'Config "' .. name .. '" does not exist.',
+            Duration = 3,
+        })
+        return false
+    end
+
+    delfile(path)
+    library:Notify({
+        Title = "Config Deleted",
+        Content = 'Deleted "' .. name .. '" successfully.',
+        Duration = 3,
+    })
+    return true
+end
+
+-- Check if a config exists
+function library:ConfigExists(name)
+    if not name or name == "" then return false end
+    ensureFolder()
+    return isfile(CONFIG_FOLDER .. "/" .. name .. ".json")
+end
+
+-- Helper: Create a full config management section in a tab
+-- Usage: library:ConfigSection(tabActions, "left")
+function library:ConfigSection(tabActions, side)
+    local section = tabActions:Section("Configuration", side)
+
+    section:Divider("Save / Load")
+
+    -- Config name input
+    section:Textbox("Config Name", "__config_name", "my_config")
+
+    -- Save button
+    section:Button("Save Config", function()
+        local name = library.flags["__config_name"]
+        if name and name ~= "" then
+            library:SaveConfig(name)
+        else
+            library:Notify({
+                Title = "Config",
+                Content = "Enter a config name first.",
+                Duration = 3,
+            })
+        end
+    end)
+
+    section:Divider("Manage")
+
+    -- Config list dropdown
+    local configList = library:GetConfigs()
+    local loadDropdown = section:Dropdown("Select Config", "__config_select", configList, function(selected)
+        -- Just selecting, no action yet
+    end)
+
+    -- Load button
+    section:Button("Load Selected", function()
+        local selected = library.flags["__config_select"]
+        if selected and selected ~= "" then
+            library:LoadConfig(selected)
+        else
+            library:Notify({
+                Title = "Config",
+                Content = "Select a config from the dropdown first.",
+                Duration = 3,
+            })
+        end
+    end)
+
+    -- Delete button
+    section:Button("Delete Selected", function()
+        local selected = library.flags["__config_select"]
+        if selected and selected ~= "" then
+            library:DeleteConfig(selected)
+            -- Refresh the dropdown after deletion
+            local newList = library:GetConfigs()
+            loadDropdown:Refresh(newList)
+            library.flags["__config_select"] = nil
+        else
+            library:Notify({
+                Title = "Config",
+                Content = "Select a config to delete.",
+                Duration = 3,
+            })
+        end
+    end)
+
+    -- Refresh list button
+    section:Button("Refresh List", function()
+        local newList = library:GetConfigs()
+        loadDropdown:Refresh(newList)
+        library:Notify({
+            Title = "Config",
+            Content = "Found " .. #newList .. " saved config(s).",
+            Duration = 3,
+        })
+    end)
+
+    section:Divider("Options")
+
+    -- Auto-load toggle
+    section:Toggle("Auto-Load on Start", "__config_autoload", false, function(enabled)
+        if enabled then
+            local name = library.flags["__config_select"]
+            if name and name ~= "" then
+                ensureFolder()
+                writefile(CONFIG_FOLDER .. "/_autoload.txt", name)
+                library:Notify({
+                    Title = "Config",
+                    Content = '"' .. name .. '" will auto-load on start.',
+                    Duration = 3,
+                })
+            else
+                library:Notify({
+                    Title = "Config",
+                    Content = "Select a config first to set as auto-load.",
+                    Duration = 3,
+                })
+            end
+        else
+            if isfile(CONFIG_FOLDER .. "/_autoload.txt") then
+                delfile(CONFIG_FOLDER .. "/_autoload.txt")
+            end
+            library:Notify({
+                Title = "Config",
+                Content = "Auto-load disabled.",
+                Duration = 3,
+            })
+        end
+    end)
+
+    return section
+end
+
+-- Auto-load config on start (call after window is created)
+function library:AutoLoadConfig()
+    ensureFolder()
+    local autoloadPath = CONFIG_FOLDER .. "/_autoload.txt"
+    if isfile(autoloadPath) then
+        local name = readfile(autoloadPath)
+        if name and name ~= "" and isfile(CONFIG_FOLDER .. "/" .. name .. ".json") then
+            library:LoadConfig(name)
+        end
+    end
 end
 
 return library
