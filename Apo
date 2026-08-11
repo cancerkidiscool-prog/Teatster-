@@ -27,9 +27,7 @@
       library:Notify({ Title = "ZalHub", Content = "Loaded", Duration = 5 })
 --]]
 
-repeat
-    wait()
-until game:IsLoaded()
+repeat wait() until game:IsLoaded()
 
 local library = {
     flags = {},
@@ -428,6 +426,48 @@ function library:Window(name)
     })
     holder.ClipsDescendants = true
     utility.stroke(holder, theme.outline, 1)
+
+    ------------------------------------------------------------------
+    -- BACKGROUND SLIDESHOW (NEW)
+    ------------------------------------------------------------------
+    local backgroundImages = {
+        138963728335206,
+        92649201368519,
+        109118923926044,
+        85401203390570,
+        116591768775487,
+        113920237539425,
+        99796065043428,
+        103460179042630,
+        110769603513462,
+    }
+
+    local bgImage = utility.create("ImageLabel", {
+        Name = "BackgroundSlideshow",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        ScaleType = Enum.ScaleType.Crop,  -- change to Stretch/Fit if preferred
+        Image = "rbxassetid://" .. backgroundImages[1],
+        ZIndex = 0,
+        Parent = holder,
+    })
+
+    task.spawn(function()
+        local currentIndex = 1
+        while true do
+            task.wait(5)
+            -- Fade out
+            utility.tween(bgImage, { 0.5, Enum.EasingStyle.Linear }, { ImageTransparency = 1 })
+            task.wait(0.5)
+
+            -- Switch
+            currentIndex = (currentIndex % #backgroundImages) + 1
+            bgImage.Image = "rbxassetid://" .. backgroundImages[currentIndex]
+
+            -- Fade in
+            utility.tween(bgImage, { 0.5, Enum.EasingStyle.Linear }, { ImageTransparency = 0 })
+        end
+    end)
 
     ------------------------------------------------------------------
     -- watermark / toggle button
@@ -1274,7 +1314,6 @@ function library:Window(name)
                         child.Visible = matched
                     end
                 end
-                -- force canvas update
                 local layout = col:FindFirstChildWhichIsA("UIListLayout")
                 if layout then
                     col.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
