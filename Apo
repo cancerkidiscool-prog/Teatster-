@@ -3,7 +3,8 @@
     (full version – background cycles images rapidly like a GIF)
     Includes: Config save/load/delete system (auto-save, live UI update, automatic auto-load on start)
     Now with: Overwrite Selected Config (quick update)
-    Improved sliders: centered Arcade value, purple gradient, rounded corners.
+    - Arcade font on everything
+    - Thinner slider with centered "current / max" display
 --]]
 
 repeat wait() until game:IsLoaded()
@@ -86,13 +87,14 @@ function utility.stroke(obj, color, thickness, transparency)
     return stroke
 end
 
+-- All labels now use Arcade font
 function utility.label(parent, text, props)
     local base = {
         BackgroundTransparency = 1,
         Text = text,
         TextColor3 = theme.text,
         TextSize = 13,
-        Font = Enum.Font.Code,
+        Font = Enum.Font.Arcade,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = parent,
     }
@@ -474,7 +476,7 @@ function library:Window(name)
         AutoButtonColor = false,
         Text = "ZalHub [ON]",
         TextColor3 = theme.text,
-        Font = Enum.Font.Code,
+        Font = Enum.Font.Arcade,
         TextSize = 14,
         ZIndex = 100,
         Parent = toggleGui,
@@ -549,7 +551,7 @@ function library:Window(name)
         PlaceholderColor3 = Color3.fromRGB(110, 110, 110),
         TextColor3 = theme.text,
         TextSize = 12,
-        Font = Enum.Font.Code,
+        Font = Enum.Font.Arcade,
         TextXAlignment = Enum.TextXAlignment.Left,
         ClearTextOnFocus = false,
         ZIndex = 6,
@@ -620,7 +622,7 @@ function library:Window(name)
             Text = tabName,
             TextColor3 = theme.dimText,
             TextSize = 14,
-            Font = Enum.Font.Code,
+            Font = Enum.Font.Arcade,
             ZIndex = 4,
             Parent = tabContainer,
         })
@@ -889,7 +891,7 @@ function library:Window(name)
             end
 
             ------------------------------------------------------------
-            -- slider (improved: centered Arcade value, purple gradient, rounded)
+            -- slider (improved: thin track, Arcade font, centered "current / max")
             ------------------------------------------------------------
             function sectionActions:Slider(text, flag, min, max, default, callback, suffix)
                 local opts = {}
@@ -898,6 +900,7 @@ function library:Window(name)
                     callback = opts.callback
                     suffix = opts.suffix or suffix
                 end
+                -- suffix is ignored in the centered display, kept only for reference
                 suffix = suffix or ""
                 local decimals = opts.decimals
                 if decimals == nil then
@@ -917,15 +920,16 @@ function library:Window(name)
                     return string.format("%." .. decimals .. "f", value)
                 end
 
+                -- Slider container (thinner overall)
                 local slider = utility.create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 38),
+                    Size = UDim2.new(1, 0, 0, 32),  -- reduced from 38
                     BackgroundTransparency = 1,
                     BorderSizePixel = 0,
                     ZIndex = 6,
                     Parent = items,
                 })
 
-                -- Label: just the name, without value
+                -- Label: just the name
                 local label = utility.label(slider, text, {
                     Size = UDim2.new(1, 0, 0, 16),
                     TextColor3 = theme.text,
@@ -933,9 +937,9 @@ function library:Window(name)
                     ZIndex = 7,
                 })
 
-                -- Track background
+                -- Track background (thinner: 14px instead of 20)
                 local bg = utility.create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 20),
+                    Size = UDim2.new(1, 0, 0, 14),
                     Position = UDim2.new(0, 0, 0, 18),
                     BackgroundColor3 = theme.control,
                     BorderSizePixel = 0,
@@ -968,15 +972,15 @@ function library:Window(name)
                 fillCorner.CornerRadius = UDim.new(0, 4)
                 fillCorner.Parent = fill
 
-                -- Centered value display (Arcade font)
+                -- Centered value display: shows "current / max" (Arcade font)
                 local valueLabel = utility.create("TextLabel", {
                     Size = UDim2.new(1, 0, 1, 0),
                     Position = UDim2.new(0.5, 0, 0.5, 0),
                     AnchorPoint = Vector2.new(0.5, 0.5),
                     BackgroundTransparency = 1,
-                    Text = fmt(initialValue) .. suffix,
+                    Text = fmt(initialValue) .. " / " .. fmt(max),
                     TextColor3 = theme.text,
-                    TextSize = 13,
+                    TextSize = 12,
                     Font = Enum.Font.Arcade,
                     TextXAlignment = Enum.TextXAlignment.Center,
                     TextYAlignment = Enum.TextYAlignment.Center,
@@ -987,7 +991,7 @@ function library:Window(name)
                 local function setValue(value, fire)
                     value = math.clamp(utility.round(value, decimals), min, max)
                     fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
-                    valueLabel.Text = fmt(value) .. suffix
+                    valueLabel.Text = fmt(value) .. " / " .. fmt(max)
                     library.flags[flag] = value
                     if fire ~= false and callback then callback(value) end
                 end
@@ -1291,7 +1295,7 @@ function library:Window(name)
                     Text = initialText,
                     TextColor3 = theme.text,
                     TextSize = 13,
-                    Font = Enum.Font.Code,
+                    Font = Enum.Font.Arcade,
                     TextXAlignment = Enum.TextXAlignment.Left,
                     ClearTextOnFocus = false,
                     ZIndex = 7,
@@ -1330,7 +1334,7 @@ function library:Window(name)
                     Text = text,
                     TextColor3 = theme.text,
                     TextSize = 13,
-                    Font = Enum.Font.Code,
+                    Font = Enum.Font.Arcade,
                     ZIndex = 6,
                     Parent = items,
                 })
