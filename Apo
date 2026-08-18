@@ -1,12 +1,3 @@
---[[
-    ZalHub UI Library  —  "CheatX" retro groupbox theme
-    (full version – background cycles images rapidly like a GIF)
-    Includes: Config save/load/delete system (auto-save, live UI update, automatic auto-load on start)
-    Now with: Overwrite Selected Config (quick update)
-    - Arcade font on everything
-    - Thinner slider with centered "current / max" display
---]]
-
 repeat wait() until game:IsLoaded()
 
 local library = {
